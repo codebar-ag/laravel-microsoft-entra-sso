@@ -1,0 +1,269 @@
+<?php
+
+/*
+ * This file is part of Psy Shell.
+ *
+ * (c) 2012-2026 Justin Hileman
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+namespace Psy;
+
+use PhpParser\Node\Expr\ClassConstFetch;
+use PhpParser\Node\Name;
+use PhpParser\Node\Name\FullyQualified;
+use PhpParser\Node\Stmt\Expression;
+use PhpParser\Node\Stmt\Namespace_;
+use PhpParser\NodeTraverser;
+use PhpParser\NodeVisitor\NameResolver;
+use PhpParser\Parser;
+use PhpParser\PrettyPrinter\Standard as Printer;
+use Psy\CodeCleaner\AbstractClassPass;
+use Psy\CodeCleaner\AssignThisVariablePass;
+use Psy\CodeCleaner\CalledClassPass;
+use Psy\CodeCleaner\CallTimePassByReferencePass;
+use Psy\CodeCleaner\CodeCleanerPass;
+use Psy\CodeCleaner\EmptyArrayDimFetchPass;
+use Psy\CodeCleaner\ExitPass;
+use Psy\CodeCleaner\FinalClassPass;
+use Psy\CodeCleaner\FunctionContextPass;
+use Psy\CodeCleaner\FunctionReturnInWriteContextPass;
+use Psy\CodeCleaner\ImplicitReturnPass;
+use Psy\CodeCleaner\ImplicitUsePass;
+use Psy\CodeCleaner\IssetPass;
+use Psy\CodeCleaner\LabelContextPass;
+use Psy\CodeCleaner\LeavePsyshAlonePass;
+use Psy\CodeCleaner\ListPass;
+use Psy\CodeCleaner\LoopContextPass;
+use Psy\CodeCleaner\MagicConstantsPass;
+use Psy\CodeCleaner\NamespaceAwarePass;
+use Psy\CodeCleaner\NamespacePass;
+use Psy\CodeCleaner\PassableByReferencePass;
+use Psy\CodeCleaner\RequirePass;
+use Psy\CodeCleaner\ReturnTypePass;
+use Psy\CodeCleaner\StrictTypesPass;
+use Psy\CodeCleaner\UseStatementPass;
+use Psy\CodeCleaner\ValidClassNamePass;
+use Psy\CodeCleaner\ValidConstructorPass;
+use Psy\CodeCleaner\ValidFunctionNamePass;
+use Psy\Exception\ParseErrorException;
+use Psy\Util\Str;
+
+/**
+ * A service to clean up user input, detect parse errors before they happen,
+ * and generally work around issues with the PHP code evaluation experience.
+ */
+class CodeCleaner
+{
+    private bool $yolo = false;
+    private bool $strictTypes = false;
+    private $implicitUse = false;
+
+    private Parser $parser;
+    private Printer $printer;
+    private NodeTraverser $traverser;
+    private ?array $namespace = null;
+    private array $messages = [];
+    private array $aliasesByNamespace = [];
+
+    /**
+     * CodeCleaner constructor.
+     *
+     * @param Parser|null        $parser      A PhpParser Parser instance. One will be created if not explicitly supplied
+     * @param Printer|null       $printer     A PhpParser Printer instance. One will be created if not explicitly supplied
+     * @param NodeTraverser|null $traverser   A PhpParser NodeTraverser instance. One will be created if not explicitly supplied
+     * @param bool               $yolo        run without input validation
+     * @param bool               $strictTypes enforce strict types by default
+     * @param false|array        $implicitUse disable implicit use statements (false) or configure with namespace filters (array)
+     */
+    public function __construct(?Parser $parser = null, ?Printer $printer = null, ?NodeTraverser $traverser = null, bool $yolo = false, bool $strictTypes = false, $implicitUse = false)
+    {
+        $this->yolo = $yolo;
+        $this->strictTypes = $strictTypes;
+        $this->implicitUse = \is_array($implicitUse) ? $implicitUse : false;
+
+        $this->parser = $parser ?? (new ParserFactory())->createParser();
+        $this->printer = $printer ?: new Printer();
+        $this->traverser = $traverser ?: new NodeTraverser();
+
+        // Try to add implicit `use` statements and an implicit namespace, based on the file in
+        // which the `debug` call was made.
+        $this->addImplicitDebugContext();
+
+        foreach ($this->getDefaultPasses() as $pass) {
+            $this->traverser->addVisitor($pass);
+
+            // Set CodeCleaner instance on NamespaceAwarePass for state management
+            if ($pass instanceof NamespaceAwarePass) {
+                $pass->setCleaner($this);
+            }
+        }
+    }
+
+    /**
+     * Check whether this CodeCleaner is in YOLO mode.
+     */
+    public function yolo(): bool
+    {
+        return $this->yolo;
+    }
+
+    /**
+     * Get default CodeCleaner passes.
+     *
+     * @return CodeCleanerPass[]
+     */
+    private function getDefaultPasses(): array
+    {
+        // Add implicit use pass if enabled (must run before use statement pass)
+        $usePasses = [new UseStatementPass()];
+        if ($this->implicitUse) {
+            \array_unshift($usePasses, new ImplicitUsePass($this->implicitUse, $this));
+        }
+
+        // A set of code cleaner passes that don't try to do any validation, and
+        // only do minimal rewriting to make things work inside the REPL.
+        //
+        // When in --yolo mode, these are the only code cleaner passes used.
+        $rewritePasses = [
+            new LeavePsyshAlonePass(),
+            new ExitPass(),
+            new ImplicitReturnPass(),
+            new MagicConstantsPass(),
+            new NamespacePass(),      // must run after the implicit return pass
+            ...$usePasses,            // must run after the namespace pass has re-injected the current namespace
+            new RequirePass(),
+            new StrictTypesPass($this->strictTypes),
+        ];
+
+        if ($this->yolo) {
+            return $rewritePasses;
+        }
+
+        return [
+            // Validation passes
+            new AbstractClassPass(),
+            new AssignThisVariablePass(),
+            new CalledClassPass(),
+            new CallTimePassByReferencePass(),
+            new FinalClassPass(),
+            new FunctionContextPass(),
+            new FunctionReturnInWriteContextPass(),
+            new IssetPass(),
+            new LabelContextPass(),
+            new ListPass(),
+            new LoopContextPass(),
+            new PassableByReferencePass(),
+            new ReturnTypePass(),
+            new EmptyArrayDimFetchPass(),
+            new ValidConstructorPass(),
+
+            // Rewriting shenanigans
+            ...$rewritePasses,
+
+            // Namespace-aware validation (which depends on aforementioned shenanigans)
+            new ValidClassNamePass(),
+            new ValidFunctionNamePass(),
+        ];
+    }
+
+    /**
+     * "Warm up" code cleaner passes when we're coming from a debug call.
+     *
+     * This sets up the alias and namespace state that `UseStatementPass` and `NamespacePass` need
+     * to track between calls.
+     */
+    private function addImplicitDebugContext()
+    {
+        $file = $this->getDebugFile();
+        if ($file === null) {
+            return;
+        }
+
+        try {
+            $code = @\file_get_contents($file);
+            if (!$code) {
+                return;
+            }
+
+            $stmts = $this->parse($code, true);
+            if ($stmts === false) {
+                return;
+            }
+
+            $useStatementPass = new UseStatementPass();
+            $useStatementPass->setCleaner($this);
+
+            $namespacePass = new NamespacePass();
+            $namespacePass->setCleaner($this);
+
+            // Set up a clean traverser for just these code cleaner passes
+            // @todo Pass visitors directly to once we drop support for PHP-Parser 4.x
+            $traverser = new NodeTraverser();
+            $traverser->addVisitor($useStatementPass);
+            $traverser->addVisitor($namespacePass);
+
+            $traverser->traverse($stmts);
+        } catch (\Throwable $e) {
+            // Don't care.
+        }
+    }
+
+    /**
+     * Search the stack trace for a file in which the user called Psy\debug.
+     *
+     * @return string|null
+     */
+    private static function getDebugFile()
+    {
+        $trace = \debug_backtrace(\DEBUG_BACKTRACE_IGNORE_ARGS);
+
+        foreach (\array_reverse($trace) as $stackFrame) {
+            if (!self::isDebugCall($stackFrame)) {
+                continue;
+            }
+
+            if (\preg_match('/eval\(/', $stackFrame['file'])) {
+                \preg_match_all('/([^\(]+)\((\d+)/', $stackFrame['file'], $matches);
+
+                return $matches[1][0];
+            }
+
+            return $stackFrame['file'];
+        }
+
+        return null;
+    }
+
+    /**
+     * Check whether a given backtrace frame is a call to Psy\debug.
+     *
+     * @param array $stackFrame
+     */
+    private static function isDebugCall(array $stackFrame): bool
+    {
+        $class = isset($stackFrame['class']) ? $stackFrame['class'] : null;
+        $function = isset($stackFrame['function']) ? $stackFrame['function'] : null;
+
+        return ($class === null && $function === 'Psy\\debug') ||
+            ($class === Shell::class && $function === 'debug');
+    }
+
+    /**
+     * Clean the given array of code.
+     *
+     * @throws ParseErrorException if the code is invalid PHP, and cannot be coerced into valid PHP
+     *
+     * @param array $codeLines
+     * @param bool  $requireSemicolons
+     *
+     * @return string|false Cleaned PHP code, False if the input is incomplete
+     */
+    public function clean(array $codeLines, bool $requireSemicolons = false)
+    {
+        // Clear messages from previous clean
+        $this->messages = [];
+
+        $stmts = $this->parse('
