@@ -7,7 +7,7 @@ Microsoft Entra ID (Azure AD) SSO authentication package for Laravel using OAuth
 
 ## Requirements
 
-- PHP 8.2+
+- PHP 8.4+
 - Laravel 12
 - A Microsoft Entra app registration
 
@@ -111,6 +111,74 @@ Under the hood the provider offers:
 - `getUserFromToken($token)`
 - `refreshAccessToken($refreshToken)`
 
+## Services and methods
+
+### Service resolution
+
+Resolve the OAuth provider via facade/manager:
+
+```php
+use CodebarAg\MicrosoftEntraSSO\Facades\MicrosoftEntraSSO;
+
+$provider = MicrosoftEntraSSO::driver('microsoft');
+```
+
+Resolve services directly from the container:
+
+```php
+use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftOAuthService;
+use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftGraphService;
+
+$oauth = app(MicrosoftOAuthService::class);
+$graph = app(MicrosoftGraphService::class);
+```
+
+### Provider API (OAuth)
+
+- `stateless(bool $stateless = true): static` - enable/disable session-less callback validation mode.
+- `getAuthorizationUrl(string $state, string $codeVerifier): string` - build Microsoft authorize URL.
+- `exchangeCodeForTokens(string $code, string $codeVerifier): SSOToken` - exchange callback code for tokens.
+- `getUserFromToken(string $accessToken): SSOUser` - fetch current Microsoft user profile from Graph `/me`.
+- `refreshAccessToken(string $refreshToken): SSOToken` - refresh an expired/expiring token.
+- `setRedirectUri(string $uri): static` - override redirect URI at runtime.
+- `getRedirectUri(): ?string` - inspect current redirect URI.
+
+Static helpers on `MicrosoftOAuthService`:
+
+- `generateState(): string` - generate random OAuth state.
+- `generateCodeVerifier(): string` - generate PKCE verifier.
+- `generateCodeChallenge(string $codeVerifier): string` - derive PKCE S256 challenge.
+
+### Graph API helper service
+
+- `getUserProfile(SSOAuthenticatable $user): array` - extended profile fields from Microsoft Graph.
+- `getUserGroups(SSOAuthenticatable $user): Collection` - all Azure AD groups for the user (handles pagination).
+- `getUserPhotoDataUri(SSOAuthenticatable $user): ?string` - profile photo as data URI (`null` when missing).
+- `isUserInGroup(SSOAuthenticatable $user, string $groupId): bool` - efficient membership check (cache-aware).
+
+### Model trait API (`HasMicrosoftSSO`)
+
+- `findByMicrosoftId(string $microsoftId): ?static`
+- `findOrCreateFromMicrosoft(array $microsoftUser): static`
+- `linkMicrosoftAccount(array $microsoftUser): void`
+- `updateMicrosoftTokens(array $microsoftUser): void`
+- `hasMicrosoftSSOLinked(): bool`
+- `isMicrosoftTokenExpired(): bool`
+- `unlinkMicrosoftAccount(): void`
+
+### Data objects
+
+`SSOToken` helpers:
+
+- `fromArray(array $payload): SSOToken`
+- `toArray(): array`
+
+`SSOUser` helpers:
+
+- `fromGraphPayload(array $graphPayload): SSOUser`
+- `withToken(SSOToken $token): SSOUser`
+- `toArray(): array`
+
 ## Blade usage
 
 Use the bundled button component in your login view:
@@ -167,6 +235,8 @@ The package dispatches:
 
 - `CodebarAg\MicrosoftEntraSSO\Events\SSOUserRegistered`
 - `CodebarAg\MicrosoftEntraSSO\Events\SSOUserAuthenticated`
+
+Both events are emitted during the callback flow after the package authenticates or registers a user.
 
 You can listen to these events to add:
 
