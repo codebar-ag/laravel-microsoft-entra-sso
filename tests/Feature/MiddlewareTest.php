@@ -40,3 +40,11 @@ it('blocks requests when tenant id is missing', function () {
 
     $response->assertStatus(503);
 });
+
+it('blocks requests when redirect uri is missing', function () {
+    config(['microsoft-entra-sso.redirect_uri' => null]);
+
+    $response = get('/test-sso-middleware');
+
+    $response->assertStatus(503);
+});

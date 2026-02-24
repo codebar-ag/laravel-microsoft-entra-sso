@@ -1,0 +1,17 @@
+<?php
+
+declare(strict_types=1);
+
+// osfsl-/Users/sebastian/Projects/swiss-product-configurator-start/packages/codebar-ag/laravel-microsoft-entra-sso/vendor/composer/../guzzlehttp/promises/src/PromiseInterface.php-presentSymbols
+return \PHPStan\Cache\CacheItem::__set_state([
+    'variableKey' => 'v2-94dc3d5b4f142ddd62eaf4e879ce1ce16525d21e6ebb4d517bfb1292ba2cea85-8.4.18',
+    'data' => [
+        'classes' => [
+            'guzzlehttp\\promise\\promiseinterface' => true,
+        ],
+        'functions' => [
+        ],
+        'constants' => [
+        ],
+    ],
+]);

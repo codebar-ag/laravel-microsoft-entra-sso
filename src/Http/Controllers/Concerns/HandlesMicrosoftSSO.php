@@ -3,10 +3,12 @@
 namespace CodebarAg\MicrosoftEntraSSO\Http\Controllers\Concerns;
 
 use CodebarAg\MicrosoftEntraSSO\Contracts\SSOAuthenticatable;
+use CodebarAg\MicrosoftEntraSSO\Data\SSOUser;
 use CodebarAg\MicrosoftEntraSSO\Events\SSOUserAuthenticated;
 use CodebarAg\MicrosoftEntraSSO\Events\SSOUserRegistered;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\InvalidStateException;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
+use CodebarAg\MicrosoftEntraSSO\Services\GuardConfigValidator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -15,15 +17,32 @@ trait HandlesMicrosoftSSO
 {
     protected function validateGuard(string $guard): void
     {
-        $guards = config('microsoft-entra-sso.guards', []);
-
-        if (! isset($guards[$guard])) {
-            throw SSOException::guardNotConfigured($guard);
-        }
+        app(GuardConfigValidator::class)->guardConfig($guard);
     }
 
-    protected function validateState(Request $request): void
+    protected function validateState(Request $request, string $guard): void
     {
+        if ((bool) config('microsoft-entra-sso.stateless', false)) {
+            return;
+        }
+
+        $sessionGuard = $request->session()->pull('microsoft_entra_sso_guard');
+        if (! is_string($sessionGuard) || $sessionGuard === '') {
+            throw InvalidStateException::make();
+        }
+        if ($sessionGuard !== $guard) {
+            throw SSOException::guardMismatch($sessionGuard, $guard);
+        }
+
+        $issuedAt = $request->session()->pull('microsoft_entra_sso_issued_at');
+        $ttl = (int) config('microsoft-entra-sso.state_ttl_seconds', 300);
+        if (! is_int($issuedAt) || $issuedAt <= 0) {
+            throw InvalidStateException::make();
+        }
+        if (time() - $issuedAt > $ttl) {
+            throw SSOException::stateExpired();
+        }
+
         $sessionState = $request->session()->pull('microsoft_entra_sso_state');
         $returnedState = $request->input('state');
 
@@ -45,16 +64,13 @@ trait HandlesMicrosoftSSO
             ->with('microsoft_entra_sso_error', $message);
     }
 
-    protected function resolveUser(array $microsoftUser, string $guard): SSOAuthenticatable
+    protected function resolveUser(SSOUser $microsoftUser, string $guard): SSOAuthenticatable
     {
-        $guardConfig = config("microsoft-entra-sso.guards.{$guard}");
+        $guardConfig = app(GuardConfigValidator::class)->guardConfig($guard);
         $modelClass = $guardConfig['model'];
+        $microsoftUserData = $microsoftUser->toArray();
 
-        if (! in_array(SSOAuthenticatable::class, class_implements($modelClass) ?: [], true)) {
-            throw SSOException::modelMissingTrait($modelClass);
-        }
-
-        $microsoftId = $microsoftUser['id'] ?? null;
+        $microsoftId = $microsoftUserData['id'] ?? null;
         if (! is_string($microsoftId) || $microsoftId === '') {
             throw SSOException::userNotFound('missing-id');
         }
@@ -63,21 +79,21 @@ trait HandlesMicrosoftSSO
         $existing = $modelClass::findByMicrosoftId($microsoftId);
 
         if ($existing) {
-            $existing->updateMicrosoftTokens($microsoftUser);
-            SSOUserAuthenticated::dispatch($existing, $guard, $microsoftUser);
+            $existing->updateMicrosoftTokens($microsoftUserData);
+            SSOUserAuthenticated::dispatch($existing, $guard, $microsoftUserData);
 
             return $existing;
         }
 
-        $email = $microsoftUser['email'] ?? null;
+        $email = $microsoftUserData['email'] ?? null;
         $byEmail = null;
         if (is_string($email) && $email !== '') {
             $byEmail = $modelClass::where('email', $email)->first();
         }
 
         if ($byEmail) {
-            $byEmail->linkMicrosoftAccount($microsoftUser);
-            SSOUserAuthenticated::dispatch($byEmail, $guard, $microsoftUser);
+            $byEmail->linkMicrosoftAccount($microsoftUserData);
+            SSOUserAuthenticated::dispatch($byEmail, $guard, $microsoftUserData);
 
             return $byEmail;
         }
@@ -87,8 +103,8 @@ trait HandlesMicrosoftSSO
         }
 
         /** @var SSOAuthenticatable $user */
-        $user = $modelClass::findOrCreateFromMicrosoft($microsoftUser);
-        SSOUserRegistered::dispatch($user, $guard, $microsoftUser);
+        $user = $modelClass::findOrCreateFromMicrosoft($microsoftUserData);
+        SSOUserRegistered::dispatch($user, $guard, $microsoftUserData);
 
         return $user;
     }

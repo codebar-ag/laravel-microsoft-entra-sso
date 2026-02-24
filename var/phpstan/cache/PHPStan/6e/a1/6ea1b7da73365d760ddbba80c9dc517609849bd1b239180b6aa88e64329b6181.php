@@ -1,0 +1,17 @@
+<?php
+
+declare(strict_types=1);
+
+// osfsl-/Users/sebastian/Projects/swiss-product-configurator-start/packages/codebar-ag/laravel-microsoft-entra-sso/vendor/composer/../laravel/framework/src/Illuminate/Contracts/Auth/CanResetPassword.php-presentSymbols
+return \PHPStan\Cache\CacheItem::__set_state([
+    'variableKey' => 'v2-af4aaebb8a63d982ca46d09b4045b9fc48b6eaff6e7acf0c6bf8481a3e4672ee-8.4.18',
+    'data' => [
+        'classes' => [
+            'illuminate\\contracts\\auth\\canresetpassword' => true,
+        ],
+        'functions' => [
+        ],
+        'constants' => [
+        ],
+    ],
+]);

@@ -32,12 +32,21 @@ abstract class TestCase extends BaseTestCase
         $app['config']->set('microsoft-entra-sso.redirect_uri', 'http://localhost/sso/microsoft/web/callback');
         $app['config']->set('microsoft-entra-sso.scopes', ['openid', 'profile', 'email', 'User.Read']);
         $app['config']->set('microsoft-entra-sso.auto_register', true);
+        $app['config']->set('microsoft-entra-sso.state_ttl_seconds', 300);
+        $app['config']->set('microsoft-entra-sso.http', [
+            'timeout' => 5,
+            'connect_timeout' => 5,
+            'retry_times' => 1,
+            'retry_sleep_ms' => 1,
+        ]);
+        $app['config']->set('microsoft-entra-sso.group_membership_cache_ttl', 0);
         $app['config']->set('microsoft-entra-sso.guards.web.model', TestUser::class);
         $app['config']->set('microsoft-entra-sso.guards.web.redirect_after_login', '/dashboard');
 
         $app['config']->set('auth.providers.users.model', TestUser::class);
         $app['config']->set('auth.guards.web.driver', 'session');
         $app['config']->set('auth.guards.web.provider', 'users');
+        $app['config']->set('cache.default', 'array');
 
         $app['config']->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
     }

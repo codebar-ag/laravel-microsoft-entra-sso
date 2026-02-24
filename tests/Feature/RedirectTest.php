@@ -30,6 +30,7 @@ it('stores state and code verifier in session', function () {
     $response->assertSessionHas('microsoft_entra_sso_state');
     $response->assertSessionHas('microsoft_entra_sso_code_verifier');
     $response->assertSessionHas('microsoft_entra_sso_guard', 'web');
+    $response->assertSessionHas('microsoft_entra_sso_issued_at');
 });
 
 it('rejects unconfigured guards', function () {

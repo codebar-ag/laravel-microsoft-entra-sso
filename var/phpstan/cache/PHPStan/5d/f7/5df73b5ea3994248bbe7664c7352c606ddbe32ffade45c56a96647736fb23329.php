@@ -1,0 +1,17 @@
+<?php
+
+declare(strict_types=1);
+
+// osfsl-/Users/sebastian/Projects/swiss-product-configurator-start/packages/codebar-ag/laravel-microsoft-entra-sso/vendor/composer/../laravel/framework/src/Illuminate/Contracts/Auth/UserProvider.php-presentSymbols
+return \PHPStan\Cache\CacheItem::__set_state([
+    'variableKey' => 'v2-6a9a08a7a0622a4740139471f18a43733891d9fde6cd24f78d44dadbac3b37f6-8.4.18',
+    'data' => [
+        'classes' => [
+            'illuminate\\contracts\\auth\\userprovider' => true,
+        ],
+        'functions' => [
+        ],
+        'constants' => [
+        ],
+    ],
+]);

@@ -1,5 +1,6 @@
 <?php
 
+use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\TokenExchangeException;
 use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftOAuthService;
 use Illuminate\Support\Facades\Http;
@@ -44,9 +45,9 @@ it('builds correct authorization url', function () {
         ->toContain('prompt=select_account');
 });
 
-it('uses common tenant when tenant id is null', function () {
+it('uses common tenant when tenant id is set to common', function () {
     $service = new MicrosoftOAuthService(
-        tenantId: null,
+        tenantId: 'common',
         clientId: 'my-client',
         clientSecret: 'my-secret',
         redirectUri: 'http://localhost/callback',
@@ -77,10 +78,9 @@ it('exchanges code for tokens successfully', function () {
 
     $tokens = $service->exchangeCodeForTokens('auth-code', 'verifier');
 
-    expect($tokens)
-        ->toHaveKey('access_token', 'access-123')
-        ->toHaveKey('refresh_token', 'refresh-456')
-        ->toHaveKey('expires_in', 3600);
+    expect($tokens->accessToken)->toBe('access-123');
+    expect($tokens->refreshToken)->toBe('refresh-456');
+    expect($tokens->expiresIn)->toBe(3600);
 });
 
 it('throws exception on failed token exchange', function () {
@@ -101,6 +101,46 @@ it('throws exception on failed token exchange', function () {
 
     $service->exchangeCodeForTokens('bad-code', 'verifier');
 })->throws(TokenExchangeException::class);
+
+it('throws exception when code verifier is missing during token exchange', function () {
+    $service = new MicrosoftOAuthService(
+        tenantId: 'test-tenant',
+        clientId: 'test-client',
+        clientSecret: 'test-secret',
+        redirectUri: 'http://localhost/callback',
+        scopes: ['openid'],
+    );
+
+    $service->exchangeCodeForTokens('auth-code', '');
+})->throws(TokenExchangeException::class);
+
+it('always sends code verifier in token exchange payload', function () {
+    Http::fake([
+        'login.microsoftonline.com/*' => Http::response([
+            'access_token' => 'access-123',
+            'refresh_token' => 'refresh-456',
+            'expires_in' => 3600,
+        ]),
+    ]);
+
+    $service = new MicrosoftOAuthService(
+        tenantId: 'test-tenant',
+        clientId: 'test-client',
+        clientSecret: 'test-secret',
+        redirectUri: 'http://localhost/callback',
+        scopes: ['openid'],
+    );
+
+    $service->stateless()->exchangeCodeForTokens('auth-code', 'verifier');
+
+    Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+        if (! str_contains($request->url(), '/oauth2/v2.0/token')) {
+            return true;
+        }
+
+        return $request['code_verifier'] === 'verifier';
+    });
+});
 
 it('fetches user from microsoft graph', function () {
     Http::fake([
@@ -124,13 +164,12 @@ it('fetches user from microsoft graph', function () {
 
     $user = $service->getUserFromToken('access-token');
 
-    expect($user)
-        ->toHaveKey('id', 'user-abc')
-        ->toHaveKey('name', 'Jane Smith')
-        ->toHaveKey('email', 'jane@example.com')
-        ->toHaveKey('job_title', 'Engineer')
-        ->toHaveKey('department', 'R&D')
-        ->toHaveKey('raw');
+    expect($user->id)->toBe('user-abc');
+    expect($user->name)->toBe('Jane Smith');
+    expect($user->email)->toBe('jane@example.com');
+    expect($user->jobTitle)->toBe('Engineer');
+    expect($user->department)->toBe('R&D');
+    expect($user->raw)->toBeArray();
 });
 
 it('refreshes access token successfully', function () {
@@ -152,7 +191,7 @@ it('refreshes access token successfully', function () {
 
     $tokens = $service->refreshAccessToken('old-refresh-token');
 
-    expect($tokens)->toHaveKey('access_token', 'new-access-token');
+    expect($tokens->accessToken)->toBe('new-access-token');
 });
 
 it('allows changing redirect uri', function () {
@@ -208,3 +247,13 @@ it('throws exception when refresh token fails', function () {
 
     $service->refreshAccessToken('expired-refresh-token');
 })->throws(TokenExchangeException::class);
+
+it('throws on missing required configuration values', function () {
+    new MicrosoftOAuthService(
+        tenantId: '',
+        clientId: 'test-client',
+        clientSecret: 'test-secret',
+        redirectUri: 'http://localhost/callback',
+        scopes: ['openid'],
+    );
+})->throws(SSOException::class);

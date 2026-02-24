@@ -24,6 +24,7 @@ it('handles unexpected throwable in callback gracefully', function () {
             'microsoft_entra_sso_state' => 'test-state',
             'microsoft_entra_sso_code_verifier' => 'test-verifier',
             'microsoft_entra_sso_guard' => 'web',
+            'microsoft_entra_sso_issued_at' => time(),
         ])
         ->get('/sso/microsoft/web/callback?code=auth-code&state=test-state');
 
@@ -53,6 +54,7 @@ it('rejects model that does not implement SSOAuthenticatable', function () {
             'microsoft_entra_sso_state' => 'test-state',
             'microsoft_entra_sso_code_verifier' => 'test-verifier',
             'microsoft_entra_sso_guard' => 'web',
+            'microsoft_entra_sso_issued_at' => time(),
         ])
         ->get('/sso/microsoft/web/callback?code=auth-code&state=test-state');
 
@@ -80,6 +82,7 @@ it('prevents callback replay because state is pulled from session', function () 
             'microsoft_entra_sso_state' => 'test-state',
             'microsoft_entra_sso_code_verifier' => 'test-verifier',
             'microsoft_entra_sso_guard' => 'web',
+            'microsoft_entra_sso_issued_at' => time(),
         ])
         ->get('/sso/microsoft/web/callback?code=auth-code&state=test-state');
 
@@ -89,6 +92,7 @@ it('prevents callback replay because state is pulled from session', function () 
         ->withSession([
             'microsoft_entra_sso_code_verifier' => 'test-verifier',
             'microsoft_entra_sso_guard' => 'web',
+            'microsoft_entra_sso_issued_at' => time(),
         ])
         ->get('/sso/microsoft/web/callback?code=auth-code&state=test-state');
 

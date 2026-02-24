@@ -18,6 +18,12 @@ it('creates guard not configured exception', function () {
     expect($exception->getMessage())->toContain('admin');
 });
 
+it('creates guard mismatch exception', function () {
+    $exception = SSOException::guardMismatch('web', 'admin');
+
+    expect($exception->getMessage())->toContain('Expected [web]');
+});
+
 it('creates model missing trait exception', function () {
     $exception = SSOException::modelMissingTrait('App\\Models\\User');
 
@@ -30,6 +36,12 @@ it('creates user not found exception', function () {
 
     expect($exception)->toBeInstanceOf(SSOException::class);
     expect($exception->getMessage())->toContain('ms-123');
+});
+
+it('creates invalid redirect uri exception', function () {
+    $exception = SSOException::invalidRedirectUri('http://evil.test/callback');
+
+    expect($exception->getMessage())->toContain('invalid');
 });
 
 it('creates invalid state exception', function () {

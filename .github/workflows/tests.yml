@@ -28,7 +28,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: dom, curl, libxml, mbstring, zip
+          extensions: dom, curl, libxml, mbstring, zip, sqlite3, pdo_sqlite
           tools: composer:v2
           coverage: none
 
@@ -38,4 +38,4 @@ jobs:
           composer update --prefer-dist --no-interaction
 
       - name: Run Tests
-        run: vendor/bin/pest
+        run: composer test

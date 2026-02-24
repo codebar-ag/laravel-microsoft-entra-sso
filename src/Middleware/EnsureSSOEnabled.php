@@ -12,7 +12,8 @@ class EnsureSSOEnabled
     {
         $hasCredentials = config('microsoft-entra-sso.client_id')
             && config('microsoft-entra-sso.client_secret')
-            && config('microsoft-entra-sso.tenant_id');
+            && config('microsoft-entra-sso.tenant_id')
+            && config('microsoft-entra-sso.redirect_uri');
 
         if (! $hasCredentials) {
             abort(503, 'Microsoft SSO is not configured.');

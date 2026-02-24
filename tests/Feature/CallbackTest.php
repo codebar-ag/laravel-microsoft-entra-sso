@@ -36,6 +36,7 @@ it('authenticates a new user via microsoft sso', function () {
             'microsoft_entra_sso_state' => 'test-state',
             'microsoft_entra_sso_code_verifier' => 'test-verifier',
             'microsoft_entra_sso_guard' => 'web',
+            'microsoft_entra_sso_issued_at' => time(),
         ])
         ->get('/sso/microsoft/web/callback?code=auth-code&state=test-state');
 
@@ -70,6 +71,7 @@ it('authenticates an existing user by microsoft id', function () {
             'microsoft_entra_sso_state' => 'test-state',
             'microsoft_entra_sso_code_verifier' => 'test-verifier',
             'microsoft_entra_sso_guard' => 'web',
+            'microsoft_entra_sso_issued_at' => time(),
         ])
         ->get('/sso/microsoft/web/callback?code=auth-code&state=test-state');
 
@@ -96,6 +98,7 @@ it('links microsoft account to existing user by email', function () {
             'microsoft_entra_sso_state' => 'test-state',
             'microsoft_entra_sso_code_verifier' => 'test-verifier',
             'microsoft_entra_sso_guard' => 'web',
+            'microsoft_entra_sso_issued_at' => time(),
         ])
         ->get('/sso/microsoft/web/callback?code=auth-code&state=test-state');
 
@@ -119,7 +122,7 @@ it('rejects callback with invalid state', function () {
         ])
         ->get('/sso/microsoft/web/callback?code=auth-code&state=wrong-state');
 
-    $response->assertRedirect();
+    $response->assertRedirect(route('login'));
     $response->assertSessionHas('microsoft_entra_sso_error');
 });
 
@@ -160,7 +163,7 @@ it('rejects callback with missing code', function () {
         ])
         ->get('/sso/microsoft/web/callback?state=test-state');
 
-    $response->assertRedirect();
+    $response->assertRedirect(route('login'));
     $response->assertSessionHas('microsoft_entra_sso_error');
 });
 
@@ -171,6 +174,7 @@ it('rejects callback with missing code verifier in session', function () {
         ->withSession([
             'microsoft_entra_sso_state' => 'test-state',
             'microsoft_entra_sso_guard' => 'web',
+            'microsoft_entra_sso_issued_at' => time(),
         ])
         ->get('/sso/microsoft/web/callback?code=auth-code&state=test-state');
 
@@ -186,6 +190,7 @@ it('rejects callback with unconfigured guard', function () {
             'microsoft_entra_sso_state' => 'test-state',
             'microsoft_entra_sso_code_verifier' => 'test-verifier',
             'microsoft_entra_sso_guard' => 'admin',
+            'microsoft_entra_sso_issued_at' => time(),
         ])
         ->get('/sso/microsoft/admin/callback?code=auth-code&state=test-state');
 
@@ -203,7 +208,7 @@ it('handles oauth error response from microsoft', function () {
         ])
         ->get('/sso/microsoft/web/callback?error=access_denied&error_description=User+cancelled&state=test-state');
 
-    $response->assertRedirect();
+    $response->assertRedirect(route('login'));
     $response->assertSessionHas('microsoft_entra_sso_error');
 });
 
@@ -216,10 +221,11 @@ it('prevents registration when auto_register is disabled', function () {
             'microsoft_entra_sso_state' => 'test-state',
             'microsoft_entra_sso_code_verifier' => 'test-verifier',
             'microsoft_entra_sso_guard' => 'web',
+            'microsoft_entra_sso_issued_at' => time(),
         ])
         ->get('/sso/microsoft/web/callback?code=auth-code&state=test-state');
 
-    $response->assertRedirect();
+    $response->assertRedirect(route('login'));
     $response->assertSessionHas('microsoft_entra_sso_error');
 
     expect(TestUser::count())->toBe(0);
@@ -238,6 +244,7 @@ it('handles token exchange failure gracefully', function () {
             'microsoft_entra_sso_state' => 'test-state',
             'microsoft_entra_sso_code_verifier' => 'test-verifier',
             'microsoft_entra_sso_guard' => 'web',
+            'microsoft_entra_sso_issued_at' => time(),
         ])
         ->get('/sso/microsoft/web/callback?code=expired-code&state=test-state');
 
@@ -253,6 +260,7 @@ it('cleans up temporary sso session values after successful login', function () 
             'microsoft_entra_sso_state' => 'test-state',
             'microsoft_entra_sso_code_verifier' => 'test-verifier',
             'microsoft_entra_sso_guard' => 'web',
+            'microsoft_entra_sso_issued_at' => time(),
         ])
         ->get('/sso/microsoft/web/callback?code=auth-code&state=test-state');
 
@@ -260,6 +268,7 @@ it('cleans up temporary sso session values after successful login', function () 
     $response->assertSessionMissing('microsoft_entra_sso_state');
     $response->assertSessionMissing('microsoft_entra_sso_code_verifier');
     $response->assertSessionMissing('microsoft_entra_sso_guard');
+    $response->assertSessionMissing('microsoft_entra_sso_issued_at');
 });
 
 it('uses intended destination when present', function () {
@@ -271,6 +280,7 @@ it('uses intended destination when present', function () {
             'microsoft_entra_sso_state' => 'test-state',
             'microsoft_entra_sso_code_verifier' => 'test-verifier',
             'microsoft_entra_sso_guard' => 'web',
+            'microsoft_entra_sso_issued_at' => time(),
         ])
         ->get('/sso/microsoft/web/callback?code=auth-code&state=test-state');
 
@@ -290,6 +300,7 @@ it('handles malformed token payload without access token', function () {
             'microsoft_entra_sso_state' => 'test-state',
             'microsoft_entra_sso_code_verifier' => 'test-verifier',
             'microsoft_entra_sso_guard' => 'web',
+            'microsoft_entra_sso_issued_at' => time(),
         ])
         ->get('/sso/microsoft/web/callback?code=auth-code&state=test-state');
 
@@ -316,9 +327,58 @@ it('handles malformed graph user payload gracefully', function () {
             'microsoft_entra_sso_state' => 'test-state',
             'microsoft_entra_sso_code_verifier' => 'test-verifier',
             'microsoft_entra_sso_guard' => 'web',
+            'microsoft_entra_sso_issued_at' => time(),
         ])
         ->get('/sso/microsoft/web/callback?code=auth-code&state=test-state');
 
     $response->assertRedirect(route('login'));
     $response->assertSessionHas('microsoft_entra_sso_error');
+});
+
+it('rejects callback when route guard does not match session guard', function () {
+    fakeSuccessfulMicrosoftAuth();
+
+    $response = $this
+        ->withSession([
+            'microsoft_entra_sso_state' => 'test-state',
+            'microsoft_entra_sso_code_verifier' => 'test-verifier',
+            'microsoft_entra_sso_guard' => 'web',
+            'microsoft_entra_sso_issued_at' => time(),
+        ])
+        ->get('/sso/microsoft/admin/callback?code=auth-code&state=test-state');
+
+    $response->assertRedirect(route('login'));
+    $response->assertSessionHas('microsoft_entra_sso_error');
+});
+
+it('rejects callback when session issued_at is missing', function () {
+    fakeSuccessfulMicrosoftAuth();
+
+    $response = $this
+        ->withSession([
+            'microsoft_entra_sso_state' => 'test-state',
+            'microsoft_entra_sso_code_verifier' => 'test-verifier',
+            'microsoft_entra_sso_guard' => 'web',
+        ])
+        ->get('/sso/microsoft/web/callback?code=auth-code&state=test-state');
+
+    $response->assertRedirect(route('login'));
+    $response->assertSessionHas('microsoft_entra_sso_error');
+});
+
+it('supports stateless callback mode', function () {
+    fakeSuccessfulMicrosoftAuth();
+    config(['microsoft-entra-sso.stateless' => true]);
+
+    $response = $this->get('/sso/microsoft/web/callback?code=auth-code&code_verifier=test-verifier');
+
+    $response->assertRedirect('/dashboard');
+
+    Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+        if (! str_contains($request->url(), '/oauth2/v2.0/token')) {
+            return true;
+        }
+
+        return $request['code_verifier'] === 'test-verifier';
+    });
 });

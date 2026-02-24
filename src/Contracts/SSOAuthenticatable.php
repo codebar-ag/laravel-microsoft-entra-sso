@@ -3,12 +3,13 @@
 namespace CodebarAg\MicrosoftEntraSSO\Contracts;
 
 use CodebarAg\MicrosoftEntraSSO\Models\MicrosoftSSOIdentity;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 /**
  * @property-read MicrosoftSSOIdentity|null $microsoftIdentity
  */
-interface SSOAuthenticatable
+interface SSOAuthenticatable extends Authenticatable
 {
     public function microsoftIdentity(): MorphOne;
 

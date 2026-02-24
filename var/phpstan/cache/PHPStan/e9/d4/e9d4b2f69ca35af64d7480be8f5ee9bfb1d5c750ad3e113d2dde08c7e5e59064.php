@@ -1,0 +1,17 @@
+<?php
+
+declare(strict_types=1);
+
+// osfsl-/Users/sebastian/Projects/swiss-product-configurator-start/packages/codebar-ag/laravel-microsoft-entra-sso/vendor/composer/../symfony/http-foundation/ResponseHeaderBag.php-presentSymbols
+return \PHPStan\Cache\CacheItem::__set_state([
+    'variableKey' => 'v2-44cacbe14ad61a9cd7414c22262478b3c67c0e2f5b0fcf644c35e3740b22422e-8.4.18',
+    'data' => [
+        'classes' => [
+            'symfony\\component\\httpfoundation\\responseheaderbag' => true,
+        ],
+        'functions' => [
+        ],
+        'constants' => [
+        ],
+    ],
+]);

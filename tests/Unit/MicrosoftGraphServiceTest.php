@@ -1,7 +1,8 @@
 <?php
 
+use CodebarAg\MicrosoftEntraSSO\Contracts\Provider;
+use CodebarAg\MicrosoftEntraSSO\Data\SSOToken;
 use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftGraphService;
-use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftOAuthService;
 use CodebarAg\MicrosoftEntraSSO\Tests\TestUser;
 use Illuminate\Support\Facades\Http;
 
@@ -25,7 +26,7 @@ function createTestUserWithIdentity(bool $expired = false): TestUser
 }
 
 beforeEach(function () {
-    $this->oauthService = Mockery::mock(MicrosoftOAuthService::class);
+    $this->oauthService = Mockery::mock(Provider::class);
     $this->graphService = new MicrosoftGraphService($this->oauthService);
 });
 
@@ -54,11 +55,7 @@ it('refreshes expired token before making profile request', function () {
         ->shouldReceive('refreshAccessToken')
         ->once()
         ->with('refresh-token')
-        ->andReturn([
-            'access_token' => 'new-token',
-            'refresh_token' => 'new-refresh',
-            'expires_in' => 3600,
-        ]);
+        ->andReturn(new SSOToken('new-token', 'new-refresh', 3600));
 
     Http::fake([
         'graph.microsoft.com/v1.0/me*' => Http::response([
@@ -151,9 +148,7 @@ it('uses fallback values when refresh response is partial', function () {
     $this->oauthService
         ->shouldReceive('refreshAccessToken')
         ->once()
-        ->andReturn([
-            'access_token' => 'new-token',
-        ]);
+        ->andReturn(new SSOToken('new-token', null, null));
 
     Http::fake([
         'graph.microsoft.com/v1.0/me*' => Http::response(['id' => 'ms-id-123']),
@@ -175,4 +170,17 @@ it('is registered as a singleton in the service provider', function () {
     expect($instance1)
         ->toBeInstanceOf(MicrosoftGraphService::class)
         ->toBe($instance2);
+});
+
+it('returns empty collection when group payload is malformed', function () {
+    $user = createTestUserWithIdentity();
+
+    Http::fake([
+        'graph.microsoft.com/v1.0/me/memberOf/microsoft.graph.group*' => Http::response([
+            '@odata.nextLink' => null,
+        ]),
+    ]);
+
+    $groups = $this->graphService->getUserGroups($user);
+    expect($groups)->toHaveCount(0);
 });

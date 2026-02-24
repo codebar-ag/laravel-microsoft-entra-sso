@@ -24,7 +24,7 @@ class HandleMicrosoftCallbackController extends Controller
     {
         try {
             $this->validateGuard($guard);
-            $this->validateState($request);
+            $this->validateState($request, $guard);
 
             if ($request->has('error')) {
                 throw TokenExchangeException::failed(
@@ -38,7 +38,10 @@ class HandleMicrosoftCallbackController extends Controller
                 throw TokenExchangeException::missingAuthorizationCode();
             }
 
-            $codeVerifier = $request->session()->pull('microsoft_entra_sso_code_verifier');
+            $codeVerifier = (bool) config('microsoft-entra-sso.stateless', false)
+                ? (string) $request->input('code_verifier', '')
+                : $request->session()->pull('microsoft_entra_sso_code_verifier');
+
             if (! is_string($codeVerifier) || $codeVerifier === '') {
                 throw TokenExchangeException::missingCodeVerifier();
             }
@@ -46,33 +49,7 @@ class HandleMicrosoftCallbackController extends Controller
             $this->oauthService->setRedirectUri($this->getCallbackUrl($guard));
 
             $tokens = $this->oauthService->exchangeCodeForTokens($code, $codeVerifier);
-            $accessToken = $tokens['access_token'] ?? null;
-            if (! is_string($accessToken) || $accessToken === '') {
-                throw TokenExchangeException::failed(
-                    'invalid_token_response',
-                    'The token response did not contain an access token.',
-                );
-            }
-
-            $microsoftUser = $this->oauthService->getUserFromToken($accessToken);
-            if (! isset($microsoftUser['id']) || ! is_string($microsoftUser['id']) || $microsoftUser['id'] === '') {
-                throw TokenExchangeException::failed(
-                    'invalid_user_response',
-                    'Microsoft Graph did not return a user identifier.',
-                );
-            }
-
-            $email = $microsoftUser['email'] ?? null;
-            if (! is_string($email) || $email === '') {
-                throw TokenExchangeException::failed(
-                    'invalid_user_response',
-                    'Microsoft Graph did not return a usable email address.',
-                );
-            }
-
-            $microsoftUser['token'] = $accessToken;
-            $microsoftUser['refresh_token'] = $tokens['refresh_token'] ?? null;
-            $microsoftUser['expires_in'] = $tokens['expires_in'] ?? null;
+            $microsoftUser = $this->oauthService->getUserFromToken($tokens->accessToken)->withToken($tokens);
 
             $user = $this->resolveUser($microsoftUser, $guard);
 
@@ -83,17 +60,22 @@ class HandleMicrosoftCallbackController extends Controller
                 'microsoft_entra_sso_state',
                 'microsoft_entra_sso_code_verifier',
                 'microsoft_entra_sso_guard',
+                'microsoft_entra_sso_issued_at',
             ]);
 
             $redirectPath = config("microsoft-entra-sso.guards.{$guard}.redirect_after_login", '/');
 
             return redirect()->intended($redirectPath);
         } catch (SSOException $e) {
-            Log::error('Microsoft Entra SSO Error: '.$e->getMessage());
+            Log::warning('Microsoft Entra SSO callback failed', [
+                'guard' => $guard,
+                'error' => $e->getMessage(),
+            ]);
 
             return $this->redirectToLoginWithError($e->getMessage());
         } catch (\Throwable $e) {
-            Log::error('Microsoft Entra SSO unexpected error: '.$e->getMessage(), [
+            Log::error('Microsoft Entra SSO unexpected callback error', [
+                'guard' => $guard,
                 'exception' => $e,
             ]);
 

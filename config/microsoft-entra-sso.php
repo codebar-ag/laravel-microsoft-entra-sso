@@ -63,6 +63,49 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | OAuth Flow Behavior
+    |--------------------------------------------------------------------------
+    |
+    | Enable stateless mode for API-style integrations where session-backed
+    | state validation is not available. When stateless is disabled, callback
+    | requests must match both the stored OAuth state and guard.
+    |
+    */
+
+    'stateless' => false,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Security Hardening
+    |--------------------------------------------------------------------------
+    |
+    | state_ttl_seconds controls how long OAuth state/code verifier values
+    | remain valid in session. allowed_redirect_hosts can be used to restrict
+    | redirect URIs to known hostnames.
+    |
+    */
+
+    'state_ttl_seconds' => 300,
+    'allowed_redirect_hosts' => [],
+
+    /*
+    |--------------------------------------------------------------------------
+    | HTTP Client Options
+    |--------------------------------------------------------------------------
+    |
+    | Configure request behavior for OAuth and Graph calls.
+    |
+    */
+
+    'http' => [
+        'timeout' => 10,
+        'connect_timeout' => 5,
+        'retry_times' => 1,
+        'retry_sleep_ms' => 200,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Guards
     |--------------------------------------------------------------------------
     |

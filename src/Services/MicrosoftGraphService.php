@@ -2,9 +2,13 @@
 
 namespace CodebarAg\MicrosoftEntraSSO\Services;
 
+use CodebarAg\MicrosoftEntraSSO\Contracts\Provider;
 use CodebarAg\MicrosoftEntraSSO\Contracts\SSOAuthenticatable;
+use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
+use CodebarAg\MicrosoftEntraSSO\Models\MicrosoftSSOIdentity;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class MicrosoftGraphService
@@ -12,7 +16,8 @@ class MicrosoftGraphService
     protected const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 
     public function __construct(
-        protected MicrosoftOAuthService $oauthService,
+        protected Provider $oauthService,
+        protected array $http = [],
     ) {}
 
     /**
@@ -80,9 +85,54 @@ class MicrosoftGraphService
     }
 
     /**
+     * Fetch the current user's Microsoft profile photo as a data URI.
+     */
+    public function getUserPhotoDataUri(SSOAuthenticatable $user): ?string
+    {
+        $response = $this->authenticatedRequest($user)
+            ->accept('*/*')
+            ->get(self::GRAPH_BASE.'/me/photo/$value');
+
+        if ($response->status() === 404) {
+            return null;
+        }
+
+        $response->throw();
+
+        $body = $response->body();
+        if ($body === '') {
+            return null;
+        }
+
+        $contentType = $response->header('Content-Type');
+        if (! is_string($contentType) || $contentType === '') {
+            $contentType = 'image/jpeg';
+        }
+
+        return sprintf('data:%s;base64,%s', $contentType, base64_encode($body));
+    }
+
+    /**
      * Efficiently check if the user is a member of a specific AD group.
      */
     public function isUserInGroup(SSOAuthenticatable $user, string $groupId): bool
+    {
+        $cacheKey = sprintf(
+            'microsoft-entra-sso:group-membership:%s:%s',
+            $user->getAuthIdentifier(),
+            $groupId
+        );
+
+        $ttl = (int) config('microsoft-entra-sso.group_membership_cache_ttl', 60);
+
+        if ($ttl > 0) {
+            return Cache::remember($cacheKey, $ttl, fn () => $this->resolveGroupMembership($user, $groupId));
+        }
+
+        return $this->resolveGroupMembership($user, $groupId);
+    }
+
+    protected function resolveGroupMembership(SSOAuthenticatable $user, string $groupId): bool
     {
         $response = $this->authenticatedRequest($user)
             ->post(self::GRAPH_BASE.'/me/checkMemberGroups', [
@@ -98,26 +148,63 @@ class MicrosoftGraphService
 
     protected function authenticatedRequest(SSOAuthenticatable $user): PendingRequest
     {
-        if ($user->isMicrosoftTokenExpired()) {
-            $this->refreshToken($user);
+        /** @var MicrosoftSSOIdentity|null $identity */
+        $identity = $user->microsoftIdentity()->first();
+        if (! $identity) {
+            throw SSOException::userNotFound('missing-identity');
         }
 
-        $identity = $user->microsoftIdentity()->first();
+        if ($user->isMicrosoftTokenExpired() || ! is_string($identity->token) || $identity->token === '') {
+            $identity = $this->refreshToken($user);
+        }
+
+        $timeout = (int) ($this->http['timeout'] ?? config('microsoft-entra-sso.http.timeout', 10));
+        $connectTimeout = (int) ($this->http['connect_timeout'] ?? config('microsoft-entra-sso.http.connect_timeout', 5));
+        $retryTimes = max(1, (int) ($this->http['retry_times'] ?? config('microsoft-entra-sso.http.retry_times', 1)));
+        $retrySleep = (int) ($this->http['retry_sleep_ms'] ?? config('microsoft-entra-sso.http.retry_sleep_ms', 200));
 
         return Http::withToken($identity->token)
+            ->timeout($timeout)
+            ->connectTimeout($connectTimeout)
+            ->retry($retryTimes, $retrySleep)
             ->acceptJson();
     }
 
-    protected function refreshToken(SSOAuthenticatable $user): void
+    protected function refreshToken(SSOAuthenticatable $user): MicrosoftSSOIdentity
     {
         $identity = $user->microsoftIdentity()->first();
+        if (! $identity) {
+            throw SSOException::userNotFound('missing-identity');
+        }
 
-        $tokens = $this->oauthService->refreshAccessToken($identity->refresh_token);
+        $lockKey = sprintf('microsoft-entra-sso:refresh:%s', $identity->id);
+        $lockTtl = (int) config('microsoft-entra-sso.refresh_lock_seconds', 10);
+        $waitSeconds = max(1, (int) config('microsoft-entra-sso.refresh_lock_wait_seconds', 5));
 
-        $user->updateMicrosoftTokens([
-            'token' => $tokens['access_token'] ?? null,
-            'refresh_token' => $tokens['refresh_token'] ?? $identity->refresh_token,
-            'expires_in' => $tokens['expires_in'] ?? null,
-        ]);
+        /** @var MicrosoftSSOIdentity $refreshedIdentity */
+        $refreshedIdentity = Cache::lock($lockKey, $lockTtl)->block($waitSeconds, function () use ($user, $identity) {
+            /** @var MicrosoftSSOIdentity|null $freshIdentity */
+            $freshIdentity = $user->microsoftIdentity()->first();
+            if ($freshIdentity && ! $freshIdentity->isTokenExpired() && is_string($freshIdentity->token) && $freshIdentity->token !== '') {
+                return $freshIdentity;
+            }
+
+            $tokens = $this->oauthService->refreshAccessToken((string) $identity->refresh_token);
+            $user->updateMicrosoftTokens([
+                'token' => $tokens->accessToken,
+                'refresh_token' => $tokens->refreshToken ?? $identity->refresh_token,
+                'expires_in' => $tokens->expiresIn,
+            ]);
+
+            /** @var MicrosoftSSOIdentity|null $updatedIdentity */
+            $updatedIdentity = $user->microsoftIdentity()->first();
+            if (! $updatedIdentity) {
+                throw SSOException::userNotFound('missing-identity');
+            }
+
+            return $updatedIdentity;
+        });
+
+        return $refreshedIdentity;
     }
 }

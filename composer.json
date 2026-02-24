@@ -29,11 +29,13 @@
         "illuminate/support": "^11.0||^12.0"
     },
     "require-dev": {
+        "larastan/larastan": "^3.9",
         "laravel/pint": "^1.24",
         "nunomaduro/collision": "^8.6",
         "orchestra/testbench": "^10.0",
         "pestphp/pest": "^3.0||^4.0",
-        "pestphp/pest-plugin-laravel": "^3.0||^4.0"
+        "pestphp/pest-plugin-laravel": "^3.0||^4.0",
+        "phpstan/phpstan": "^2.1"
     },
     "autoload": {
         "psr-4": {
@@ -49,7 +51,13 @@
         "test": "vendor/bin/pest",
         "test-coverage": "vendor/bin/pest --coverage --min=100",
         "format": "vendor/bin/pint",
-        "lint": "vendor/bin/pint --test"
+        "lint": "vendor/bin/pint --test",
+        "analyse": "vendor/bin/phpstan analyse --level=5 src",
+        "quality": [
+            "@lint",
+            "@analyse",
+            "@test"
+        ]
     },
     "config": {
         "sort-packages": true,
