@@ -126,6 +126,24 @@ it('rejects callback with invalid state', function () {
     $response->assertSessionHas('microsoft_entra_sso_error');
 });
 
+it('uses translated german error text for invalid oauth state', function () {
+    fakeSuccessfulMicrosoftAuth();
+    app()->setLocale('de');
+
+    $response = $this
+        ->withSession([
+            'microsoft_entra_sso_state' => 'correct-state',
+            'microsoft_entra_sso_code_verifier' => 'test-verifier',
+        ])
+        ->get('/sso/microsoft/web/callback?code=auth-code&state=wrong-state');
+
+    $response->assertRedirect(route('login'));
+    $response->assertSessionHas(
+        'microsoft_entra_sso_error',
+        __('microsoft-entra-sso.error.oauth_state_invalid'),
+    );
+});
+
 it('rejects callback when state is missing from request', function () {
     fakeSuccessfulMicrosoftAuth();
 

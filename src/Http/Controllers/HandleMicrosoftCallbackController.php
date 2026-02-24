@@ -80,7 +80,7 @@ class HandleMicrosoftCallbackController extends Controller
             ]);
 
             return $this->redirectToLoginWithError(
-                'An unexpected error occurred during Microsoft sign-in. Please try again.',
+                __('microsoft-entra-sso.error.unexpected_callback'),
             );
         }
     }

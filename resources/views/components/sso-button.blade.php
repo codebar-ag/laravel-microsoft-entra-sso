@@ -1,6 +1,6 @@
 @props([
     'guard' => 'web',
-    'label' => 'Sign in with Microsoft',
+    'label' => 'microsoft-entra-sso.button.sign_in',
     'class' => '',
 ])
 

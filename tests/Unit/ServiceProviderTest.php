@@ -6,6 +6,7 @@ use CodebarAg\MicrosoftEntraSSO\MicrosoftEntraSSOManager;
 use CodebarAg\MicrosoftEntraSSO\MicrosoftEntraSSOServiceProvider;
 use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftOAuthService;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\ServiceProvider;
 
 it('registers microsoft oauth service as singleton', function () {
     $instance1 = app(MicrosoftOAuthService::class);
@@ -44,4 +45,22 @@ it('skips publishables when not running in console', function () {
     $result = $reflection->invoke($provider);
 
     expect($result)->toBeNull();
+});
+
+it('loads package json translations', function () {
+    app()->setLocale('de');
+
+    expect(__('microsoft-entra-sso.button.sign_in'))->toBe('Mit Microsoft anmelden');
+});
+
+it('registers translation publish paths', function () {
+    $paths = ServiceProvider::pathsToPublish(
+        MicrosoftEntraSSOServiceProvider::class,
+        'microsoft-entra-sso-translations',
+    );
+
+    expect(array_values($paths))->toContain(lang_path('en.json'));
+    expect(array_values($paths))->toContain(lang_path('de.json'));
+    expect(collect(array_keys($paths))->contains(fn (string $path) => str_ends_with($path, '/lang/en.json')))->toBeTrue();
+    expect(collect(array_keys($paths))->contains(fn (string $path) => str_ends_with($path, '/lang/de.json')))->toBeTrue();
 });

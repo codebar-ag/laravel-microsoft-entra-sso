@@ -8,7 +8,7 @@ Microsoft Entra ID (Azure AD) SSO authentication package for Laravel using OAuth
 ## Requirements
 
 - PHP 8.2+
-- Laravel 11 or 12
+- Laravel 12
 - A Microsoft Entra app registration
 
 ## Installation
@@ -21,6 +21,12 @@ Publish config (optional, recommended):
 
 ```bash
 php artisan vendor:publish --tag=microsoft-entra-sso-config
+```
+
+Publish package translations (recommended if you want to customize text or add locales):
+
+```bash
+php artisan vendor:publish --tag=microsoft-entra-sso-translations
 ```
 
 ## Configuration
@@ -110,10 +116,30 @@ Under the hood the provider offers:
 Use the bundled button component in your login view:
 
 ```blade
-<x-microsoft-entra-sso::sso-button guard="web">
-    Sign in with Microsoft
-</x-microsoft-entra-sso::sso-button>
+<x-microsoft-entra-sso::sso-button guard="web" />
 ```
+
+You can override the label with a translation key:
+
+```blade
+<x-microsoft-entra-sso::sso-button
+    guard="web"
+    label="microsoft-entra-sso.button.sign_in"
+/>
+```
+
+## Translations
+
+The package ships with JSON translations for:
+
+- `lang/en.json`
+- `lang/de.json`
+
+After publishing (`microsoft-entra-sso-translations`), you can:
+
+- edit existing keys in your application's `lang/en.json` and `lang/de.json`
+- add additional locales by creating files like `lang/fr.json` with the same keys
+- set `APP_LOCALE` (and optionally `APP_FALLBACK_LOCALE`) to control runtime language
 
 ## Tailwind v4 (plain Tailwind, no Flux)
 

@@ -6,6 +6,6 @@ class InvalidStateException extends SSOException
 {
     public static function make(): self
     {
-        return new self('The OAuth state parameter does not match the expected value. This may indicate a CSRF attack.');
+        return new self(__('microsoft-entra-sso.error.oauth_state_invalid'));
     }
 }

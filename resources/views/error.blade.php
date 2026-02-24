@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{{ __('SSO Authentication Error') }} — {{ config('app.name') }}</title>
+    <title>{{ __('microsoft-entra-sso.error.page_title') }} — {{ config('app.name') }}</title>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -99,8 +99,8 @@
             </svg>
         </div>
 
-        <h1>{{ __('Authentication Failed') }}</h1>
-        <p class="message">{{ __('We couldn\'t sign you in with your Microsoft account. This could be a temporary issue — please try again.') }}</p>
+        <h1>{{ __('microsoft-entra-sso.error.auth_failed') }}</h1>
+        <p class="message">{{ __('microsoft-entra-sso.error.auth_failed_message') }}</p>
 
         @if(isset($error))
             <div class="error-detail">{{ $error }}</div>
@@ -110,7 +110,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clip-rule="evenodd" />
             </svg>
-            {{ __('Back to Login') }}
+            {{ __('microsoft-entra-sso.button.back_to_login') }}
         </a>
 
         <p class="footer">{{ config('app.name') }} &mdash; Microsoft Entra SSO</p>

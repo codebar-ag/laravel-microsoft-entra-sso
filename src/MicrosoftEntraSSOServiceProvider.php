@@ -45,6 +45,7 @@ class MicrosoftEntraSSOServiceProvider extends ServiceProvider
     {
         $this->registerRoutes();
         $this->registerMigrations();
+        $this->registerTranslations();
         $this->registerViews();
         $this->registerPublishables();
     }
@@ -64,6 +65,11 @@ class MicrosoftEntraSSOServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'microsoft-entra-sso');
     }
 
+    protected function registerTranslations(): void
+    {
+        $this->loadJsonTranslationsFrom(__DIR__.'/../lang');
+    }
+
     protected function registerPublishables(): void
     {
         if (! $this->app->runningInConsole()) {
@@ -77,5 +83,10 @@ class MicrosoftEntraSSOServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../resources/views' => resource_path('views/vendor/microsoft-entra-sso'),
         ], 'microsoft-entra-sso-views');
+
+        $this->publishes([
+            __DIR__.'/../lang/en.json' => lang_path('en.json'),
+            __DIR__.'/../lang/de.json' => lang_path('de.json'),
+        ], 'microsoft-entra-sso-translations');
     }
 }
