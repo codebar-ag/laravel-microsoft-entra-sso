@@ -4,7 +4,7 @@ namespace CodebarAg\MicrosoftEntraSSO\Exceptions;
 
 class TokenExchangeException extends SSOException
 {
-    public static function failed(string $error, string $description = ''): static
+    public static function failed(string $error, string $description = ''): self
     {
         $message = "Token exchange failed: {$error}";
 
@@ -12,16 +12,16 @@ class TokenExchangeException extends SSOException
             $message .= " — {$description}";
         }
 
-        return new static($message);
+        return new self($message);
     }
 
-    public static function missingAuthorizationCode(): static
+    public static function missingAuthorizationCode(): self
     {
-        return new static('The authorization code is missing from the callback request.');
+        return new self('The authorization code is missing from the callback request.');
     }
 
-    public static function missingCodeVerifier(): static
+    public static function missingCodeVerifier(): self
     {
-        return new static('The PKCE code verifier is missing from the session. Please start the sign-in flow again.');
+        return new self('The PKCE code verifier is missing from the session. Please start the sign-in flow again.');
     }
 }

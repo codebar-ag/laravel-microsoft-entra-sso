@@ -52,7 +52,7 @@
         "test-coverage": "vendor/bin/pest --coverage --min=100",
         "format": "vendor/bin/pint",
         "lint": "vendor/bin/pint --test",
-        "analyse": "vendor/bin/phpstan analyse --level=5 src",
+        "analyse": "vendor/bin/phpstan analyse -c phpstan.neon.dist",
         "quality": [
             "@lint",
             "@analyse",

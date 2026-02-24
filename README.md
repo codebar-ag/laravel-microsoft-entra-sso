@@ -173,6 +173,8 @@ Run static analysis:
 composer analyse
 ```
 
+`composer analyse` runs PHPStan/Larastan using `phpstan.neon.dist` at level 9.
+
 Run package tests:
 
 ```bash
