@@ -194,6 +194,7 @@ class MicrosoftGraphService
                 'token' => $tokens->accessToken,
                 'refresh_token' => $tokens->refreshToken ?? $identity->refresh_token,
                 'expires_in' => $tokens->expiresIn,
+                'refresh_token_expires_in' => $tokens->refreshTokenExpiresIn,
             ]);
 
             /** @var MicrosoftSSOIdentity|null $updatedIdentity */

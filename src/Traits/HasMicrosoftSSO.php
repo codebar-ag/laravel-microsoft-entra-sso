@@ -56,12 +56,17 @@ trait HasMicrosoftSSO
 
     public function linkMicrosoftAccount(array $microsoftUser): void
     {
+        $refreshToken = $microsoftUser['refresh_token'] ?? null;
+
         $this->microsoftIdentity()->updateOrCreate([], [
             'microsoft_id' => $microsoftUser['id'],
             'token' => $microsoftUser['token'] ?? null,
-            'refresh_token' => $microsoftUser['refresh_token'] ?? null,
+            'refresh_token' => $refreshToken,
             'token_expires_at' => isset($microsoftUser['expires_in'])
                 ? Carbon::now()->addSeconds($microsoftUser['expires_in'])
+                : null,
+            'refresh_token_expires_at' => $refreshToken !== null
+                ? self::computeRefreshTokenExpiresAt($microsoftUser)
                 : null,
             'linked_at' => Carbon::now(),
         ]);
@@ -77,11 +82,16 @@ trait HasMicrosoftSSO
             return;
         }
 
+        $refreshToken = $microsoftUser['refresh_token'] ?? null;
+
         $data = array_filter([
             'token' => $microsoftUser['token'] ?? null,
-            'refresh_token' => $microsoftUser['refresh_token'] ?? null,
+            'refresh_token' => $refreshToken,
             'token_expires_at' => isset($microsoftUser['expires_in'])
                 ? Carbon::now()->addSeconds($microsoftUser['expires_in'])
+                : null,
+            'refresh_token_expires_at' => $refreshToken !== null
+                ? self::computeRefreshTokenExpiresAt($microsoftUser)
                 : null,
         ]);
 
@@ -90,6 +100,22 @@ trait HasMicrosoftSSO
         }
 
         $this->unsetRelation('microsoftIdentity');
+    }
+
+    /**
+     * @param  array<string, mixed>  $microsoftUser
+     */
+    protected static function computeRefreshTokenExpiresAt(array $microsoftUser): Carbon
+    {
+        $expiresIn = $microsoftUser['refresh_token_expires_in'] ?? null;
+
+        if (is_int($expiresIn) && $expiresIn > 0) {
+            return Carbon::now()->addSeconds($expiresIn);
+        }
+
+        $defaultDays = (int) config('microsoft-entra-sso.refresh_token_expires_default_days', 30);
+
+        return Carbon::now()->addDays(max(1, $defaultDays));
     }
 
     public function hasMicrosoftSSOLinked(): bool

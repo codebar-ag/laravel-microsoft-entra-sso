@@ -20,6 +20,7 @@ class SSOUser
         public readonly ?string $token = null,
         public readonly ?string $refreshToken = null,
         public readonly ?int $expiresIn = null,
+        public readonly ?int $refreshTokenExpiresIn = null,
         public readonly array $approvedScopes = [],
     ) {}
 
@@ -66,6 +67,7 @@ class SSOUser
             token: $token->accessToken,
             refreshToken: $token->refreshToken,
             expiresIn: $token->expiresIn,
+            refreshTokenExpiresIn: $token->refreshTokenExpiresIn,
             approvedScopes: $token->approvedScopes,
         );
     }
@@ -85,6 +87,7 @@ class SSOUser
             'token' => $this->token,
             'refresh_token' => $this->refreshToken,
             'expires_in' => $this->expiresIn,
+            'refresh_token_expires_in' => $this->refreshTokenExpiresIn,
             'approved_scopes' => $this->approvedScopes,
         ];
     }

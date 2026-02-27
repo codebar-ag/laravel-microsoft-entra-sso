@@ -18,6 +18,7 @@ class MicrosoftSSOIdentity extends Model
             'token' => 'encrypted',
             'refresh_token' => 'encrypted',
             'token_expires_at' => 'datetime',
+            'refresh_token_expires_at' => 'datetime',
             'linked_at' => 'datetime',
         ];
     }
@@ -39,6 +40,15 @@ class MicrosoftSSOIdentity extends Model
         }
 
         return $this->token_expires_at->isPast();
+    }
+
+    public function isRefreshTokenExpired(): bool
+    {
+        if (! $this->refresh_token_expires_at) {
+            return false;
+        }
+
+        return $this->refresh_token_expires_at->isPast();
     }
 
     public function scopeByMicrosoftId(Builder $query, string $microsoftId): Builder

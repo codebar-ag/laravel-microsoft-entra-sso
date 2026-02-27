@@ -90,6 +90,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Refresh Token Expiry
+    |--------------------------------------------------------------------------
+    |
+    | When Microsoft does not return refresh_token_expires_in in the OAuth2
+    | token response, this value (in days) is used to set refresh_token_expires_at.
+    | Microsoft typically omits this field; the default provides a conservative
+    | estimate for proactive re-auth prompts and cleanup.
+    |
+    */
+
+    'refresh_token_expires_default_days' => 30,
+
+    /*
+    |--------------------------------------------------------------------------
     | HTTP Client Options
     |--------------------------------------------------------------------------
     |

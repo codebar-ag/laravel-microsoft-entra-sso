@@ -76,6 +76,7 @@ abstract class TestCase extends BaseTestCase
             $table->text('token')->nullable();
             $table->text('refresh_token')->nullable();
             $table->timestamp('token_expires_at')->nullable();
+            $table->timestamp('refresh_token_expires_at')->nullable();
             $table->timestamp('linked_at')->nullable();
             $table->timestamps();
         });

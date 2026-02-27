@@ -13,6 +13,7 @@ class SSOToken
         public readonly string $accessToken,
         public readonly ?string $refreshToken,
         public readonly ?int $expiresIn,
+        public readonly ?int $refreshTokenExpiresIn = null,
         public readonly array $approvedScopes = [],
     ) {}
 
@@ -35,10 +36,13 @@ class SSOToken
             $approvedScopes = preg_split('/[\s,]+/', trim($scopeValue)) ?: [];
         }
 
+        $refreshTokenExpiresIn = $payload['refresh_token_expires_in'] ?? null;
+
         return new self(
             accessToken: $accessToken,
             refreshToken: is_string($payload['refresh_token'] ?? null) ? $payload['refresh_token'] : null,
             expiresIn: is_int($payload['expires_in'] ?? null) ? $payload['expires_in'] : null,
+            refreshTokenExpiresIn: is_int($refreshTokenExpiresIn) ? $refreshTokenExpiresIn : null,
             approvedScopes: array_values(array_filter($approvedScopes, static fn ($scope) => is_string($scope) && $scope !== '')),
         );
     }
@@ -52,6 +56,7 @@ class SSOToken
             'access_token' => $this->accessToken,
             'refresh_token' => $this->refreshToken,
             'expires_in' => $this->expiresIn,
+            'refresh_token_expires_in' => $this->refreshTokenExpiresIn,
             'scope' => implode(' ', $this->approvedScopes),
         ];
     }
