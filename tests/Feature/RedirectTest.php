@@ -2,6 +2,7 @@
 
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
 use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftOAuthService;
+use CodebarAg\MicrosoftEntraSSO\Tests\TestUser;
 
 use function Pest\Laravel\get;
 
@@ -63,7 +64,7 @@ it('includes configured scopes in redirect url', function () {
 it('supports guard names with underscores', function () {
     config([
         'microsoft-entra-sso.guards.admin_api' => [
-            'model' => \CodebarAg\MicrosoftEntraSSO\Tests\TestUser::class,
+            'model' => TestUser::class,
             'redirect_after_login' => '/dashboard',
         ],
     ]);
@@ -75,7 +76,7 @@ it('supports guard names with underscores', function () {
 });
 
 it('handles redirect service exceptions gracefully', function () {
-    $mock = \Mockery::mock(MicrosoftOAuthService::class);
+    $mock = Mockery::mock(MicrosoftOAuthService::class);
     $mock->shouldReceive('setRedirectUri')->once()->andReturnSelf();
     $mock->shouldReceive('getAuthorizationUrl')
         ->once()

@@ -3,6 +3,7 @@
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\TokenExchangeException;
 use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftOAuthService;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 
 it('generates a random state string', function () {
@@ -133,7 +134,7 @@ it('always sends code verifier in token exchange payload', function () {
 
     $service->stateless()->exchangeCodeForTokens('auth-code', 'verifier');
 
-    Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+    Http::assertSent(function (Request $request) {
         if (! str_contains($request->url(), '/oauth2/v2.0/token')) {
             return true;
         }
