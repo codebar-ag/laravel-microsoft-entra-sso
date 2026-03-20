@@ -3,6 +3,7 @@
 use CodebarAg\MicrosoftEntraSSO\Events\SSOUserAuthenticated;
 use CodebarAg\MicrosoftEntraSSO\Events\SSOUserRegistered;
 use CodebarAg\MicrosoftEntraSSO\Tests\TestUser;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
@@ -392,7 +393,7 @@ it('supports stateless callback mode', function () {
 
     $response->assertRedirect('/dashboard');
 
-    Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+    Http::assertSent(function (Request $request) {
         if (! str_contains($request->url(), '/oauth2/v2.0/token')) {
             return true;
         }

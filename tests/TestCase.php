@@ -4,6 +4,7 @@ namespace CodebarAg\MicrosoftEntraSSO\Tests;
 
 use CodebarAg\MicrosoftEntraSSO\MicrosoftEntraSSOServiceProvider;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 
@@ -53,8 +54,8 @@ abstract class TestCase extends BaseTestCase
 
     protected function registerTestRoutes(): void
     {
-        \Illuminate\Support\Facades\Route::get('/login', fn () => 'login page')->name('login');
-        \Illuminate\Support\Facades\Route::get('/dashboard', fn () => 'dashboard')->name('dashboard');
+        Route::get('/login', fn () => 'login page')->name('login');
+        Route::get('/dashboard', fn () => 'dashboard')->name('dashboard');
     }
 
     protected function setUpDatabase(): void

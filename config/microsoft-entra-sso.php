@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\User;
+
 return [
 
     /*
@@ -117,7 +119,7 @@ return [
 
     'guards' => [
         'web' => [
-            'model' => \App\Models\User::class,
+            'model' => User::class,
             'redirect_after_login' => '/dashboard',
         ],
     ],

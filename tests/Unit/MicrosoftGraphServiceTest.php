@@ -4,6 +4,7 @@ use CodebarAg\MicrosoftEntraSSO\Contracts\Provider;
 use CodebarAg\MicrosoftEntraSSO\Data\SSOToken;
 use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftGraphService;
 use CodebarAg\MicrosoftEntraSSO\Tests\TestUser;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 
 function createTestUserWithIdentity(bool $expired = false): TestUser
@@ -140,7 +141,7 @@ it('throws on http error from graph api', function () {
     ]);
 
     $this->graphService->getUserProfile($user);
-})->throws(\Illuminate\Http\Client\RequestException::class);
+})->throws(RequestException::class);
 
 it('uses fallback values when refresh response is partial', function () {
     $user = createTestUserWithIdentity(expired: true);

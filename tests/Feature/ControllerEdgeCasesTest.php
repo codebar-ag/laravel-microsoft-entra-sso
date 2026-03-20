@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Http;
 
 it('handles unexpected throwable in callback gracefully', function () {
@@ -47,7 +48,7 @@ it('rejects model that does not implement SSOAuthenticatable', function () {
         ]),
     ]);
 
-    config(['microsoft-entra-sso.guards.web.model' => \Illuminate\Foundation\Auth\User::class]);
+    config(['microsoft-entra-sso.guards.web.model' => User::class]);
 
     $response = $this
         ->withSession([
