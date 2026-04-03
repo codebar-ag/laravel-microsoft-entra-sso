@@ -23,6 +23,7 @@ class MicrosoftOAuthService implements Provider
 
     /**
      * @param  array<int, string>  $scopes
+     * @param  array<string, mixed>  $http
      */
     public function __construct(
         protected ?string $tenantId,
@@ -99,14 +100,27 @@ class MicrosoftOAuthService implements Provider
 
         if ($response->failed()) {
             $body = $response->json();
+            if (! is_array($body)) {
+                $body = [];
+            }
+            $error = $body['error'] ?? 'unknown_error';
+            $description = $body['error_description'] ?? '';
 
             throw TokenExchangeException::failed(
-                $body['error'] ?? 'unknown_error',
-                $body['error_description'] ?? '',
+                is_string($error) ? $error : 'unknown_error',
+                is_string($description) ? $description : '',
             );
         }
 
-        return SSOToken::fromArray($response->json());
+        $data = $response->json();
+        if (! is_array($data)) {
+            throw TokenExchangeException::failed(
+                'invalid_token_response',
+                'The token response was not valid JSON.',
+            );
+        }
+
+        return SSOToken::fromArray(self::jsonAsAssoc($data));
     }
 
     public function getUserFromToken(string $accessToken): SSOUser
@@ -122,7 +136,15 @@ class MicrosoftOAuthService implements Provider
             );
         }
 
-        return SSOUser::fromGraphPayload($response->json());
+        $data = $response->json();
+        if (! is_array($data)) {
+            throw TokenExchangeException::failed(
+                'invalid_user_response',
+                'Microsoft Graph returned invalid JSON.',
+            );
+        }
+
+        return SSOUser::fromGraphPayload(self::jsonAsAssoc($data));
     }
 
     public function refreshAccessToken(string $refreshToken): SSOToken
@@ -137,14 +159,27 @@ class MicrosoftOAuthService implements Provider
 
         if ($response->failed()) {
             $body = $response->json();
+            if (! is_array($body)) {
+                $body = [];
+            }
+            $error = $body['error'] ?? 'unknown_error';
+            $description = $body['error_description'] ?? '';
 
             throw TokenExchangeException::failed(
-                $body['error'] ?? 'unknown_error',
-                $body['error_description'] ?? '',
+                is_string($error) ? $error : 'unknown_error',
+                is_string($description) ? $description : '',
             );
         }
 
-        return SSOToken::fromArray($response->json());
+        $data = $response->json();
+        if (! is_array($data)) {
+            throw TokenExchangeException::failed(
+                'invalid_token_response',
+                'The token response was not valid JSON.',
+            );
+        }
+
+        return SSOToken::fromArray(self::jsonAsAssoc($data));
     }
 
     public function getRedirectUri(): ?string
@@ -186,22 +221,60 @@ class MicrosoftOAuthService implements Provider
             return;
         }
 
+        $hosts = [];
+        foreach ($allowedHosts as $h) {
+            if (is_string($h) && $h !== '') {
+                $hosts[] = $h;
+            }
+        }
+
         $host = parse_url($this->redirectUri, PHP_URL_HOST);
-        if (! is_string($host) || $host === '' || ! in_array($host, $allowedHosts, true)) {
+        if (! is_string($host) || $host === '' || ! in_array($host, $hosts, true)) {
             throw SSOException::invalidRedirectUri($this->redirectUri);
         }
     }
 
     protected function httpClient(): PendingRequest
     {
-        $timeout = (int) ($this->http['timeout'] ?? config('microsoft-entra-sso.http.timeout', 10));
-        $connectTimeout = (int) ($this->http['connect_timeout'] ?? config('microsoft-entra-sso.http.connect_timeout', 5));
-        $retryTimes = (int) ($this->http['retry_times'] ?? config('microsoft-entra-sso.http.retry_times', 1));
-        $retrySleep = (int) ($this->http['retry_sleep_ms'] ?? config('microsoft-entra-sso.http.retry_sleep_ms', 200));
+        $timeout = $this->intHttpValue('timeout', 10);
+        $connectTimeout = $this->intHttpValue('connect_timeout', 5);
+        $retryTimes = $this->intHttpValue('retry_times', 1);
+        $retrySleep = $this->intHttpValue('retry_sleep_ms', 200);
 
         return Http::timeout($timeout)
             ->connectTimeout($connectTimeout)
             ->retry($retryTimes, $retrySleep)
             ->acceptJson();
+    }
+
+    private function intHttpValue(string $key, int $default): int
+    {
+        $v = $this->http[$key] ?? config("microsoft-entra-sso.http.{$key}", $default);
+        if (is_int($v)) {
+            return $v;
+        }
+        if (is_numeric($v)) {
+            return (int) $v;
+        }
+
+        return $default;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function jsonAsAssoc(mixed $data): array
+    {
+        if (! is_array($data)) {
+            return [];
+        }
+        $out = [];
+        foreach ($data as $key => $value) {
+            if (is_string($key)) {
+                $out[$key] = $value;
+            }
+        }
+
+        return $out;
     }
 }

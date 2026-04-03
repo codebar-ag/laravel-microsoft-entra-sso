@@ -46,7 +46,11 @@ class SSOUser
 
         return new self(
             id: $id,
-            name: (string) ($graphPayload['displayName'] ?? ''),
+            name: (function () use ($graphPayload): string {
+                $n = $graphPayload['displayName'] ?? '';
+
+                return is_string($n) ? $n : '';
+            })(),
             email: $email,
             jobTitle: is_string($graphPayload['jobTitle'] ?? null) ? $graphPayload['jobTitle'] : null,
             department: is_string($graphPayload['department'] ?? null) ? $graphPayload['department'] : null,

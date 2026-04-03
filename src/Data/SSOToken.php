@@ -35,11 +35,13 @@ class SSOToken
             $approvedScopes = preg_split('/[\s,]+/', trim($scopeValue)) ?: [];
         }
 
+        $refreshToken = $payload['refresh_token'] ?? null;
+
         return new self(
             accessToken: $accessToken,
-            refreshToken: is_string($payload['refresh_token'] ?? null) ? $payload['refresh_token'] : null,
+            refreshToken: is_string($refreshToken) ? $refreshToken : null,
             expiresIn: is_int($payload['expires_in'] ?? null) ? $payload['expires_in'] : null,
-            approvedScopes: array_values(array_filter($approvedScopes, static fn ($scope) => is_string($scope) && $scope !== '')),
+            approvedScopes: array_values(array_filter($approvedScopes, static fn (string $scope) => $scope !== '')),
         );
     }
 

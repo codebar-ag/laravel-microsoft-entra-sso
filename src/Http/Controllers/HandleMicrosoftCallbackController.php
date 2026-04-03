@@ -27,9 +27,11 @@ class HandleMicrosoftCallbackController extends Controller
             $this->validateState($request, $guard);
 
             if ($request->has('error')) {
+                $err = $request->input('error', 'unknown_error');
+                $desc = $request->input('error_description', '');
                 throw TokenExchangeException::failed(
-                    (string) $request->input('error', 'unknown_error'),
-                    (string) $request->input('error_description', ''),
+                    is_string($err) ? $err : 'unknown_error',
+                    is_string($desc) ? $desc : '',
                 );
             }
 
@@ -39,7 +41,7 @@ class HandleMicrosoftCallbackController extends Controller
             }
 
             $codeVerifier = (bool) config('microsoft-entra-sso.stateless', false)
-                ? (string) $request->input('code_verifier', '')
+                ? self::stringFromInput($request->input('code_verifier', ''))
                 : $request->session()->pull('microsoft_entra_sso_code_verifier');
 
             if (! is_string($codeVerifier) || $codeVerifier === '') {
@@ -64,6 +66,7 @@ class HandleMicrosoftCallbackController extends Controller
             ]);
 
             $redirectPath = config("microsoft-entra-sso.guards.{$guard}.redirect_after_login", '/');
+            $redirectPath = is_string($redirectPath) && $redirectPath !== '' ? $redirectPath : '/';
 
             return redirect()->intended($redirectPath);
         } catch (SSOException $e) {
@@ -83,5 +86,10 @@ class HandleMicrosoftCallbackController extends Controller
                 __('microsoft-entra-sso.error.unexpected_callback'),
             );
         }
+    }
+
+    private static function stringFromInput(mixed $value): string
+    {
+        return is_string($value) ? $value : '';
     }
 }
