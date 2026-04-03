@@ -9,6 +9,7 @@ use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftOAuthService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -27,9 +28,11 @@ class HandleMicrosoftCallbackController extends Controller
             $this->validateState($request, $guard);
 
             if ($request->has('error')) {
+                $err = $request->input('error', 'unknown_error');
+                $desc = $request->input('error_description', '');
                 throw TokenExchangeException::failed(
-                    (string) $request->input('error', 'unknown_error'),
-                    (string) $request->input('error_description', ''),
+                    is_string($err) ? $err : 'unknown_error',
+                    is_string($desc) ? $desc : '',
                 );
             }
 
@@ -39,7 +42,7 @@ class HandleMicrosoftCallbackController extends Controller
             }
 
             $codeVerifier = (bool) config('microsoft-entra-sso.stateless', false)
-                ? (string) $request->input('code_verifier', '')
+                ? self::stringFromInput($request->input('code_verifier', ''))
                 : $request->session()->pull('microsoft_entra_sso_code_verifier');
 
             if (! is_string($codeVerifier) || $codeVerifier === '') {
@@ -63,7 +66,14 @@ class HandleMicrosoftCallbackController extends Controller
                 'microsoft_entra_sso_issued_at',
             ]);
 
-            $redirectPath = config("microsoft-entra-sso.guards.{$guard}.redirect_after_login", '/');
+            $guardsConfig = config('microsoft-entra-sso.guards', []);
+            $guardsConfig = is_array($guardsConfig) ? $guardsConfig : [];
+            $guardEntry = Arr::get($guardsConfig, $guard);
+            $redirectPath = '/';
+            if (is_array($guardEntry)) {
+                $path = Arr::get($guardEntry, 'redirect_after_login', '/');
+                $redirectPath = is_string($path) && $path !== '' ? $path : '/';
+            }
 
             return redirect()->intended($redirectPath);
         } catch (SSOException $e) {
@@ -83,5 +93,10 @@ class HandleMicrosoftCallbackController extends Controller
                 __('microsoft-entra-sso.error.unexpected_callback'),
             );
         }
+    }
+
+    private static function stringFromInput(mixed $value): string
+    {
+        return is_string($value) ? $value : '';
     }
 }

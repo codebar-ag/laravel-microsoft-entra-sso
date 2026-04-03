@@ -17,12 +17,12 @@ class MicrosoftEntraSSOServiceProvider extends ServiceProvider
 
         $this->app->singleton(MicrosoftOAuthService::class, function ($app) {
             $service = new MicrosoftOAuthService(
-                tenantId: config('microsoft-entra-sso.tenant_id'),
-                clientId: config('microsoft-entra-sso.client_id'),
-                clientSecret: config('microsoft-entra-sso.client_secret'),
-                redirectUri: config('microsoft-entra-sso.redirect_uri'),
-                scopes: config('microsoft-entra-sso.scopes', []),
-                http: config('microsoft-entra-sso.http', []),
+                tenantId: self::nullableString(config('microsoft-entra-sso.tenant_id')),
+                clientId: self::nullableString(config('microsoft-entra-sso.client_id')),
+                clientSecret: self::nullableString(config('microsoft-entra-sso.client_secret')),
+                redirectUri: self::nullableString(config('microsoft-entra-sso.redirect_uri')),
+                scopes: self::stringListConfig('microsoft-entra-sso.scopes', []),
+                http: self::httpConfigArray(),
             );
 
             return $service->stateless((bool) config('microsoft-entra-sso.stateless', false));
@@ -34,11 +34,43 @@ class MicrosoftEntraSSOServiceProvider extends ServiceProvider
         $this->app->singleton(MicrosoftGraphService::class, function ($app) {
             return new MicrosoftGraphService(
                 $app->make(MicrosoftOAuthService::class),
-                config('microsoft-entra-sso.http', []),
+                self::httpConfigArray(),
             );
         });
 
         $this->app->singleton(GuardConfigValidator::class);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function httpConfigArray(): array
+    {
+        $v = config('microsoft-entra-sso.http', []);
+
+        return is_array($v) ? $v : [];
+    }
+
+    /**
+     * @param  array<int, string>  $default
+     * @return array<int, string>
+     */
+    private static function stringListConfig(string $key, array $default): array
+    {
+        $v = config($key, $default);
+        if (! is_array($v)) {
+            return $default;
+        }
+
+        return collect($v)
+            ->filter(fn ($item) => is_string($item))
+            ->values()
+            ->all();
+    }
+
+    private static function nullableString(mixed $value): ?string
+    {
+        return is_string($value) ? $value : null;
     }
 
     public function boot(): void

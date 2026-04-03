@@ -1,5 +1,6 @@
 <?php
 
+use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
 use CodebarAg\MicrosoftEntraSSO\Models\MicrosoftSSOIdentity;
 use CodebarAg\MicrosoftEntraSSO\Tests\TestUser;
 
@@ -85,6 +86,52 @@ it('links microsoft account to existing user by email', function () {
     expect(TestUser::count())->toBe(1);
     expect($result->microsoftIdentity->microsoft_id)->toBe('ms-link');
 });
+
+it('throws when microsoft id is missing in findOrCreateFromMicrosoft', function () {
+    TestUser::findOrCreateFromMicrosoft([
+        'email' => 'a@example.com',
+        'name' => 'A',
+    ]);
+})->throws(SSOException::class);
+
+it('throws when microsoft id is empty string in findOrCreateFromMicrosoft', function () {
+    TestUser::findOrCreateFromMicrosoft([
+        'id' => '',
+        'email' => 'a@example.com',
+        'name' => 'A',
+    ]);
+})->throws(SSOException::class);
+
+it('throws when microsoft id is not a string in findOrCreateFromMicrosoft', function () {
+    TestUser::findOrCreateFromMicrosoft([
+        'id' => 123,
+        'email' => 'a@example.com',
+        'name' => 'A',
+    ]);
+})->throws(SSOException::class);
+
+it('throws when email is missing after microsoft id lookup in findOrCreateFromMicrosoft', function () {
+    TestUser::findOrCreateFromMicrosoft([
+        'id' => 'ms-new-no-email',
+        'name' => 'No Email',
+    ]);
+})->throws(SSOException::class);
+
+it('throws when email is empty string in findOrCreateFromMicrosoft', function () {
+    TestUser::findOrCreateFromMicrosoft([
+        'id' => 'ms-empty-email',
+        'email' => '',
+        'name' => 'Empty Email',
+    ]);
+})->throws(SSOException::class);
+
+it('throws when email is not a string in findOrCreateFromMicrosoft', function () {
+    TestUser::findOrCreateFromMicrosoft([
+        'id' => 'ms-bad-email',
+        'email' => ['not-a-string'],
+        'name' => 'Bad Email',
+    ]);
+})->throws(SSOException::class);
 
 it('links microsoft account to user instance', function () {
     $user = TestUser::create([

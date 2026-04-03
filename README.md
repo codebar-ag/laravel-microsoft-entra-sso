@@ -1,14 +1,18 @@
-# Laravel Microsoft Entra SSO
+<img src="https://banners.beyondco.de/Laravel%20Microsoft%20Entra%20SSO.png?theme=light&packageManager=composer+require&packageName=codebar-ag%2Flaravel-microsoft-entra-sso&pattern=circuitBoard&style=style_2&description=Microsoft+Entra+ID+SSO+authentication+for+Laravel.&md=1&showWatermark=0&fontSize=150px&images=home&widths=500&heights=500">
 
-[![Tests](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/tests.yml)
-[![Linter](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/lint.yml)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/codebar-ag/laravel-microsoft-entra-sso.svg?style=flat-square)](https://packagist.org/packages/codebar-ag/laravel-microsoft-entra-sso)
+[![Total Downloads](https://img.shields.io/packagist/dt/codebar-ag/laravel-microsoft-entra-sso.svg?style=flat-square)](https://packagist.org/packages/codebar-ag/laravel-microsoft-entra-sso)
+[![GitHub-Tests](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/tests.yml)
+[![GitHub Code Style](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/fix-php-code-style-issues.yml/badge.svg?branch=main)](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/fix-php-code-style-issues.yml)
+[![PHPStan](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/phpstan.yml/badge.svg)](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/phpstan.yml)
+[![Dependency Review](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/dependency-review.yml/badge.svg)](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/dependency-review.yml)
 
 Microsoft Entra ID (Azure AD) SSO authentication package for Laravel using OAuth2 + OpenID Connect.
 
 ## Requirements
 
-- PHP 8.4+
-- Laravel 12
+- PHP 8.3, 8.4, or 8.5
+- Laravel 13
 - A Microsoft Entra app registration
 
 ## Installation

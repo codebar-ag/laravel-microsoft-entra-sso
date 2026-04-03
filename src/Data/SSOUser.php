@@ -3,6 +3,7 @@
 namespace CodebarAg\MicrosoftEntraSSO\Data;
 
 use CodebarAg\MicrosoftEntraSSO\Exceptions\TokenExchangeException;
+use Illuminate\Support\Arr;
 
 class SSOUser
 {
@@ -28,7 +29,7 @@ class SSOUser
      */
     public static function fromGraphPayload(array $graphPayload): self
     {
-        $id = $graphPayload['id'] ?? null;
+        $id = Arr::get($graphPayload, 'id');
         if (! is_string($id) || $id === '') {
             throw TokenExchangeException::failed(
                 'invalid_user_response',
@@ -36,7 +37,7 @@ class SSOUser
             );
         }
 
-        $email = $graphPayload['mail'] ?? $graphPayload['userPrincipalName'] ?? null;
+        $email = Arr::get($graphPayload, 'mail') ?? Arr::get($graphPayload, 'userPrincipalName');
         if (! is_string($email) || $email === '') {
             throw TokenExchangeException::failed(
                 'invalid_user_response',
@@ -44,12 +45,17 @@ class SSOUser
             );
         }
 
+        $displayName = Arr::get($graphPayload, 'displayName');
+        $name = is_string($displayName) ? $displayName : '';
+        $jobTitle = Arr::get($graphPayload, 'jobTitle');
+        $department = Arr::get($graphPayload, 'department');
+
         return new self(
             id: $id,
-            name: (string) ($graphPayload['displayName'] ?? ''),
+            name: $name,
             email: $email,
-            jobTitle: is_string($graphPayload['jobTitle'] ?? null) ? $graphPayload['jobTitle'] : null,
-            department: is_string($graphPayload['department'] ?? null) ? $graphPayload['department'] : null,
+            jobTitle: is_string($jobTitle) ? $jobTitle : null,
+            department: is_string($department) ? $department : null,
             raw: $graphPayload,
         );
     }

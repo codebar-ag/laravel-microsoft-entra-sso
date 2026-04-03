@@ -9,8 +9,10 @@ use CodebarAg\MicrosoftEntraSSO\Events\SSOUserRegistered;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\InvalidStateException;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
 use CodebarAg\MicrosoftEntraSSO\Services\GuardConfigValidator;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Route;
 
 trait HandlesMicrosoftSSO
@@ -35,7 +37,11 @@ trait HandlesMicrosoftSSO
         }
 
         $issuedAt = $request->session()->pull('microsoft_entra_sso_issued_at');
-        $ttl = (int) config('microsoft-entra-sso.state_ttl_seconds', 300);
+        if (is_string($issuedAt) && ctype_digit($issuedAt)) {
+            $issuedAt = (int) $issuedAt;
+        }
+        $ttlRaw = config('microsoft-entra-sso.state_ttl_seconds', 300);
+        $ttl = is_int($ttlRaw) ? $ttlRaw : (is_numeric($ttlRaw) ? (int) $ttlRaw : 300);
         if (! is_int($issuedAt) || $issuedAt <= 0) {
             throw InvalidStateException::make();
         }
@@ -53,7 +59,10 @@ trait HandlesMicrosoftSSO
 
     protected function getCallbackUrl(string $guard): string
     {
-        return url(config('microsoft-entra-sso.route_prefix')."/{$guard}/callback");
+        $prefix = config('microsoft-entra-sso.route_prefix', 'sso/microsoft');
+        $prefix = is_string($prefix) && $prefix !== '' ? $prefix : 'sso/microsoft';
+
+        return url($prefix."/{$guard}/callback");
     }
 
     protected function redirectToLoginWithError(string $message): RedirectResponse
@@ -67,15 +76,18 @@ trait HandlesMicrosoftSSO
     protected function resolveUser(SSOUser $microsoftUser, string $guard): SSOAuthenticatable
     {
         $guardConfig = app(GuardConfigValidator::class)->guardConfig($guard);
-        $modelClass = $guardConfig['model'];
+        $modelClass = Arr::get($guardConfig, 'model');
+        if (! is_string($modelClass) || $modelClass === '') {
+            throw SSOException::guardModelNotConfigured($guard);
+        }
+        /** @var class-string<Model&SSOAuthenticatable> $modelClass */
         $microsoftUserData = $microsoftUser->toArray();
 
-        $microsoftId = $microsoftUserData['id'] ?? null;
+        $microsoftId = Arr::get($microsoftUserData, 'id');
         if (! is_string($microsoftId) || $microsoftId === '') {
             throw SSOException::userNotFound('missing-id');
         }
 
-        /** @var SSOAuthenticatable|null $existing */
         $existing = $modelClass::findByMicrosoftId($microsoftId);
 
         if ($existing) {
@@ -85,13 +97,13 @@ trait HandlesMicrosoftSSO
             return $existing;
         }
 
-        $email = $microsoftUserData['email'] ?? null;
+        $email = Arr::get($microsoftUserData, 'email');
         $byEmail = null;
         if (is_string($email) && $email !== '') {
-            $byEmail = $modelClass::where('email', $email)->first();
+            $byEmail = $modelClass::query()->where('email', $email)->first();
         }
 
-        if ($byEmail) {
+        if ($byEmail instanceof SSOAuthenticatable) {
             $byEmail->linkMicrosoftAccount($microsoftUserData);
             SSOUserAuthenticated::dispatch($byEmail, $guard, $microsoftUserData);
 
@@ -102,7 +114,6 @@ trait HandlesMicrosoftSSO
             throw SSOException::userNotFound($microsoftId);
         }
 
-        /** @var SSOAuthenticatable $user */
         $user = $modelClass::findOrCreateFromMicrosoft($microsoftUserData);
         SSOUserRegistered::dispatch($user, $guard, $microsoftUserData);
 

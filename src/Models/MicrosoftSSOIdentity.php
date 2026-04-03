@@ -5,7 +5,14 @@ namespace CodebarAg\MicrosoftEntraSSO\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string|null $token
+ * @property string|null $refresh_token
+ * @property Carbon|null $token_expires_at
+ * @property Carbon|null $linked_at
+ */
 class MicrosoftSSOIdentity extends Model
 {
     protected $table = 'microsoft_sso_identities';
@@ -27,6 +34,9 @@ class MicrosoftSSOIdentity extends Model
         'refresh_token',
     ];
 
+    /**
+     * @return MorphTo<Model, $this>
+     */
     public function authenticatable(): MorphTo
     {
         return $this->morphTo();
@@ -41,11 +51,19 @@ class MicrosoftSSOIdentity extends Model
         return $this->token_expires_at->isPast();
     }
 
+    /**
+     * @param  Builder<MicrosoftSSOIdentity>  $query
+     * @return Builder<MicrosoftSSOIdentity>
+     */
     public function scopeByMicrosoftId(Builder $query, string $microsoftId): Builder
     {
         return $query->where('microsoft_id', $microsoftId);
     }
 
+    /**
+     * @param  Builder<MicrosoftSSOIdentity>  $query
+     * @return Builder<MicrosoftSSOIdentity>
+     */
     public function scopeForAuthenticatable(Builder $query, Model $model): Builder
     {
         return $query
