@@ -3,6 +3,7 @@
 namespace CodebarAg\MicrosoftEntraSSO\Data;
 
 use CodebarAg\MicrosoftEntraSSO\Exceptions\TokenExchangeException;
+use Illuminate\Support\Arr;
 
 class SSOToken
 {
@@ -21,7 +22,7 @@ class SSOToken
      */
     public static function fromArray(array $payload): self
     {
-        $accessToken = $payload['access_token'] ?? null;
+        $accessToken = Arr::get($payload, 'access_token');
         if (! is_string($accessToken) || $accessToken === '') {
             throw TokenExchangeException::failed(
                 'invalid_token_response',
@@ -29,19 +30,24 @@ class SSOToken
             );
         }
 
-        $scopeValue = $payload['scope'] ?? '';
+        $scopeValue = Arr::get($payload, 'scope', '');
         $approvedScopes = [];
         if (is_string($scopeValue) && $scopeValue !== '') {
-            $approvedScopes = preg_split('/[\s,]+/', trim($scopeValue)) ?: [];
+            $parts = preg_split('/[\s,]+/', trim($scopeValue)) ?: [];
+            $approvedScopes = collect($parts)
+                ->filter(fn (string $scope) => $scope !== '')
+                ->values()
+                ->all();
         }
 
-        $refreshToken = $payload['refresh_token'] ?? null;
+        $refreshToken = Arr::get($payload, 'refresh_token');
+        $expiresIn = Arr::get($payload, 'expires_in');
 
         return new self(
             accessToken: $accessToken,
             refreshToken: is_string($refreshToken) ? $refreshToken : null,
-            expiresIn: is_int($payload['expires_in'] ?? null) ? $payload['expires_in'] : null,
-            approvedScopes: array_values(array_filter($approvedScopes, static fn (string $scope) => $scope !== '')),
+            expiresIn: is_int($expiresIn) ? $expiresIn : null,
+            approvedScopes: $approvedScopes,
         );
     }
 

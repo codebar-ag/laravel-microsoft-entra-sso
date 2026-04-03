@@ -61,14 +61,11 @@ class MicrosoftEntraSSOServiceProvider extends ServiceProvider
         if (! is_array($v)) {
             return $default;
         }
-        $out = [];
-        foreach ($v as $item) {
-            if (is_string($item)) {
-                $out[] = $item;
-            }
-        }
 
-        return $out;
+        return collect($v)
+            ->filter(fn ($item) => is_string($item))
+            ->values()
+            ->all();
     }
 
     private static function nullableString(mixed $value): ?string

@@ -8,6 +8,7 @@ use CodebarAg\MicrosoftEntraSSO\Data\SSOUser;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\TokenExchangeException;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
@@ -103,8 +104,8 @@ class MicrosoftOAuthService implements Provider
             if (! is_array($body)) {
                 $body = [];
             }
-            $error = $body['error'] ?? 'unknown_error';
-            $description = $body['error_description'] ?? '';
+            $error = Arr::get($body, 'error', 'unknown_error');
+            $description = Arr::get($body, 'error_description', '');
 
             throw TokenExchangeException::failed(
                 is_string($error) ? $error : 'unknown_error',
@@ -162,8 +163,8 @@ class MicrosoftOAuthService implements Provider
             if (! is_array($body)) {
                 $body = [];
             }
-            $error = $body['error'] ?? 'unknown_error';
-            $description = $body['error_description'] ?? '';
+            $error = Arr::get($body, 'error', 'unknown_error');
+            $description = Arr::get($body, 'error_description', '');
 
             throw TokenExchangeException::failed(
                 is_string($error) ? $error : 'unknown_error',
@@ -197,11 +198,15 @@ class MicrosoftOAuthService implements Provider
 
     protected function validateConfiguration(): void
     {
-        foreach (['tenant_id' => $this->tenantId, 'client_id' => $this->clientId, 'client_secret' => $this->clientSecret] as $key => $value) {
+        collect([
+            'tenant_id' => $this->tenantId,
+            'client_id' => $this->clientId,
+            'client_secret' => $this->clientSecret,
+        ])->each(function (mixed $value, string $key): void {
             if (! is_string($value) || $value === '') {
                 throw SSOException::configurationMissing($key);
             }
-        }
+        });
 
         $this->validateRedirectUri();
     }
@@ -221,12 +226,10 @@ class MicrosoftOAuthService implements Provider
             return;
         }
 
-        $hosts = [];
-        foreach ($allowedHosts as $h) {
-            if (is_string($h) && $h !== '') {
-                $hosts[] = $h;
-            }
-        }
+        $hosts = collect($allowedHosts)
+            ->filter(fn ($h) => is_string($h) && $h !== '')
+            ->values()
+            ->all();
 
         $host = parse_url($this->redirectUri, PHP_URL_HOST);
         if (! is_string($host) || $host === '' || ! in_array($host, $hosts, true)) {
@@ -249,7 +252,7 @@ class MicrosoftOAuthService implements Provider
 
     private function intHttpValue(string $key, int $default): int
     {
-        $v = $this->http[$key] ?? config("microsoft-entra-sso.http.{$key}", $default);
+        $v = Arr::get($this->http, $key) ?? config("microsoft-entra-sso.http.{$key}", $default);
         if (is_int($v)) {
             return $v;
         }
@@ -268,13 +271,9 @@ class MicrosoftOAuthService implements Provider
         if (! is_array($data)) {
             return [];
         }
-        $out = [];
-        foreach ($data as $key => $value) {
-            if (is_string($key)) {
-                $out[$key] = $value;
-            }
-        }
 
-        return $out;
+        return collect($data)
+            ->filter(fn ($v, $k) => is_string($k))
+            ->all();
     }
 }

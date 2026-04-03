@@ -6,6 +6,7 @@ use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
 use CodebarAg\MicrosoftEntraSSO\Models\MicrosoftSSOIdentity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -37,7 +38,7 @@ trait HasMicrosoftSSO
      */
     public static function findOrCreateFromMicrosoft(array $microsoftUser): static
     {
-        $mid = $microsoftUser['id'] ?? null;
+        $mid = Arr::get($microsoftUser, 'id');
         if (! is_string($mid) || $mid === '') {
             throw SSOException::userNotFound('missing-id');
         }
@@ -50,7 +51,7 @@ trait HasMicrosoftSSO
             return $existing;
         }
 
-        $email = $microsoftUser['email'] ?? null;
+        $email = Arr::get($microsoftUser, 'email');
         if (! is_string($email) || $email === '') {
             throw SSOException::userNotFound('missing-email');
         }
@@ -63,7 +64,7 @@ trait HasMicrosoftSSO
             return $byEmail;
         }
 
-        $name = $microsoftUser['name'] ?? null;
+        $name = Arr::get($microsoftUser, 'name');
         if (! is_string($name)) {
             $name = '';
         }
@@ -86,20 +87,21 @@ trait HasMicrosoftSSO
      */
     public function linkMicrosoftAccount(array $microsoftUser): void
     {
-        $mid = $microsoftUser['id'] ?? null;
+        $mid = Arr::get($microsoftUser, 'id');
         if (! is_string($mid) || $mid === '') {
             throw SSOException::userNotFound('missing-id');
         }
 
         $expiresAt = null;
-        if (isset($microsoftUser['expires_in']) && is_numeric($microsoftUser['expires_in'])) {
-            $expiresAt = Carbon::now()->addSeconds((int) $microsoftUser['expires_in']);
+        $expiresIn = Arr::get($microsoftUser, 'expires_in');
+        if ($expiresIn !== null && is_numeric($expiresIn)) {
+            $expiresAt = Carbon::now()->addSeconds((int) $expiresIn);
         }
 
         $this->microsoftIdentity()->updateOrCreate([], [
             'microsoft_id' => $mid,
-            'token' => $microsoftUser['token'] ?? null,
-            'refresh_token' => $microsoftUser['refresh_token'] ?? null,
+            'token' => Arr::get($microsoftUser, 'token'),
+            'refresh_token' => Arr::get($microsoftUser, 'refresh_token'),
             'token_expires_at' => $expiresAt,
             'linked_at' => Carbon::now(),
         ]);
@@ -119,13 +121,14 @@ trait HasMicrosoftSSO
         }
 
         $expiresAt = null;
-        if (isset($microsoftUser['expires_in']) && is_numeric($microsoftUser['expires_in'])) {
-            $expiresAt = Carbon::now()->addSeconds((int) $microsoftUser['expires_in']);
+        $expiresIn = Arr::get($microsoftUser, 'expires_in');
+        if ($expiresIn !== null && is_numeric($expiresIn)) {
+            $expiresAt = Carbon::now()->addSeconds((int) $expiresIn);
         }
 
         $data = array_filter([
-            'token' => $microsoftUser['token'] ?? null,
-            'refresh_token' => $microsoftUser['refresh_token'] ?? null,
+            'token' => Arr::get($microsoftUser, 'token'),
+            'refresh_token' => Arr::get($microsoftUser, 'refresh_token'),
             'token_expires_at' => $expiresAt,
         ]);
 

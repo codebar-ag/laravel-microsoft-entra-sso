@@ -3,6 +3,8 @@ includes:
 
 parameters:
     level: 9
+    # Only package source is analysed here; Pest feature tests use Laravel helpers
+    # (e.g. withSession) and expect() generics that do not pass Larastan at level 9.
     paths:
         - src
     tmpDir: var/phpstan

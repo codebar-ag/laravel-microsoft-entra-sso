@@ -84,6 +84,54 @@ it('exchanges code for tokens successfully', function () {
     expect($tokens->expiresIn)->toBe(3600);
 });
 
+it('throws exception when token endpoint returns success with non-json body', function () {
+    Http::fake([
+        'login.microsoftonline.com/*' => Http::response('not json', 200),
+    ]);
+
+    $service = new MicrosoftOAuthService(
+        tenantId: 'test-tenant',
+        clientId: 'test-client',
+        clientSecret: 'test-secret',
+        redirectUri: 'http://localhost/callback',
+        scopes: ['openid'],
+    );
+
+    $service->exchangeCodeForTokens('auth-code', 'verifier');
+})->throws(TokenExchangeException::class);
+
+it('throws exception when graph me returns success with non-json body', function () {
+    Http::fake([
+        'graph.microsoft.com/*' => Http::response('<html></html>', 200),
+    ]);
+
+    $service = new MicrosoftOAuthService(
+        tenantId: 'test-tenant',
+        clientId: 'test-client',
+        clientSecret: 'test-secret',
+        redirectUri: 'http://localhost/callback',
+        scopes: ['openid'],
+    );
+
+    $service->getUserFromToken('access-token');
+})->throws(TokenExchangeException::class);
+
+it('throws exception when refresh returns success with non-json body', function () {
+    Http::fake([
+        'login.microsoftonline.com/*' => Http::response('', 200),
+    ]);
+
+    $service = new MicrosoftOAuthService(
+        tenantId: 'test-tenant',
+        clientId: 'test-client',
+        clientSecret: 'test-secret',
+        redirectUri: 'http://localhost/callback',
+        scopes: ['openid'],
+    );
+
+    $service->refreshAccessToken('refresh-token');
+})->throws(TokenExchangeException::class);
+
 it('throws exception on failed token exchange', function () {
     Http::fake([
         'login.microsoftonline.com/*' => Http::response([

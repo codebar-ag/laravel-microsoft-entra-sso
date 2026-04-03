@@ -31,6 +31,22 @@ it('creates model missing trait exception', function () {
     expect($exception->getMessage())->toContain('App\\Models\\User');
 });
 
+it('creates guard model must be eloquent exception', function () {
+    $exception = SSOException::guardModelMustBeEloquent('SomeClass');
+
+    expect($exception)->toBeInstanceOf(SSOException::class);
+    expect($exception->getMessage())->toContain('SomeClass');
+});
+
+it('creates invalid graph response exceptions', function () {
+    $profile = SSOException::invalidGraphResponse('profile');
+    $groups = SSOException::invalidGraphResponse('groups');
+
+    expect($profile)->toBeInstanceOf(SSOException::class);
+    expect($groups)->toBeInstanceOf(SSOException::class);
+    expect($profile->getMessage())->not->toBe($groups->getMessage());
+});
+
 it('creates user not found exception', function () {
     $exception = SSOException::userNotFound('ms-123');
 

@@ -7,6 +7,7 @@ use CodebarAg\MicrosoftEntraSSO\Contracts\SSOAuthenticatable;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
 use CodebarAg\MicrosoftEntraSSO\Models\MicrosoftSSOIdentity;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -64,7 +65,7 @@ class MicrosoftGraphService
 
         $data = $response->json();
         if (! is_array($data)) {
-            throw SSOException::userNotFound('invalid-graph-profile');
+            throw SSOException::invalidGraphResponse('profile');
         }
 
         return $this->normalizeUserProfile(self::jsonAsAssoc($data));
@@ -86,19 +87,15 @@ class MicrosoftGraphService
 
             $data = $response->json();
             if (! is_array($data)) {
-                break;
+                throw SSOException::invalidGraphResponse('groups');
             }
-            $value = $data['value'] ?? [];
-            $chunk = [];
-            if (is_array($value)) {
-                foreach ($value as $item) {
-                    if (is_array($item)) {
-                        $chunk[] = $item;
-                    }
-                }
-            }
+            $value = Arr::get($data, 'value', []);
+            $chunk = collect(is_array($value) ? $value : [])
+                ->filter(fn ($item) => is_array($item))
+                ->values()
+                ->all();
             $groups = $groups->concat($chunk);
-            $next = $data['@odata.nextLink'] ?? null;
+            $next = Arr::get($data, '@odata.nextLink');
             $url = is_string($next) && $next !== '' ? $next : null;
         } while ($url);
 
@@ -167,14 +164,10 @@ class MicrosoftGraphService
         if (! is_array($raw)) {
             return false;
         }
-        $matchedIds = [];
-        foreach ($raw as $id) {
-            if (is_string($id)) {
-                $matchedIds[] = $id;
-            }
-        }
 
-        return in_array($groupId, $matchedIds, true);
+        return collect($raw)
+            ->filter(fn ($id) => is_string($id))
+            ->containsStrict($groupId);
     }
 
     protected function authenticatedRequest(SSOAuthenticatable $user): PendingRequest
@@ -256,7 +249,7 @@ class MicrosoftGraphService
 
     private function intHttpValue(string $key, int $default): int
     {
-        $v = $this->http[$key] ?? config("microsoft-entra-sso.http.{$key}", $default);
+        $v = Arr::get($this->http, $key) ?? config("microsoft-entra-sso.http.{$key}", $default);
         if (is_int($v)) {
             return $v;
         }
@@ -291,34 +284,34 @@ class MicrosoftGraphService
      */
     private function normalizeUserProfile(array $data): array
     {
-        $id = $data['id'] ?? null;
+        $id = Arr::get($data, 'id');
         if (! is_string($id) || $id === '') {
-            throw SSOException::userNotFound('invalid-graph-profile');
+            throw SSOException::invalidGraphResponse('profile');
         }
 
-        $phones = $data['businessPhones'] ?? [];
+        $phones = Arr::get($data, 'businessPhones', []);
         if (! is_array($phones)) {
             $phones = [];
         }
 
         return [
             'id' => $id,
-            'displayName' => self::optionalString($data['displayName'] ?? null),
-            'givenName' => self::optionalString($data['givenName'] ?? null),
-            'surname' => self::optionalString($data['surname'] ?? null),
-            'mail' => self::optionalString($data['mail'] ?? null),
-            'userPrincipalName' => self::optionalString($data['userPrincipalName'] ?? null),
-            'jobTitle' => self::optionalString($data['jobTitle'] ?? null),
-            'department' => self::optionalString($data['department'] ?? null),
-            'officeLocation' => self::optionalString($data['officeLocation'] ?? null),
-            'mobilePhone' => self::optionalString($data['mobilePhone'] ?? null),
+            'displayName' => self::optionalString(Arr::get($data, 'displayName')),
+            'givenName' => self::optionalString(Arr::get($data, 'givenName')),
+            'surname' => self::optionalString(Arr::get($data, 'surname')),
+            'mail' => self::optionalString(Arr::get($data, 'mail')),
+            'userPrincipalName' => self::optionalString(Arr::get($data, 'userPrincipalName')),
+            'jobTitle' => self::optionalString(Arr::get($data, 'jobTitle')),
+            'department' => self::optionalString(Arr::get($data, 'department')),
+            'officeLocation' => self::optionalString(Arr::get($data, 'officeLocation')),
+            'mobilePhone' => self::optionalString(Arr::get($data, 'mobilePhone')),
             'businessPhones' => $phones,
-            'city' => self::optionalString($data['city'] ?? null),
-            'state' => self::optionalString($data['state'] ?? null),
-            'country' => self::optionalString($data['country'] ?? null),
-            'postalCode' => self::optionalString($data['postalCode'] ?? null),
-            'companyName' => self::optionalString($data['companyName'] ?? null),
-            'employeeId' => self::optionalString($data['employeeId'] ?? null),
+            'city' => self::optionalString(Arr::get($data, 'city')),
+            'state' => self::optionalString(Arr::get($data, 'state')),
+            'country' => self::optionalString(Arr::get($data, 'country')),
+            'postalCode' => self::optionalString(Arr::get($data, 'postalCode')),
+            'companyName' => self::optionalString(Arr::get($data, 'companyName')),
+            'employeeId' => self::optionalString(Arr::get($data, 'employeeId')),
         ];
     }
 
@@ -335,14 +328,10 @@ class MicrosoftGraphService
         if (! is_array($data)) {
             return [];
         }
-        $out = [];
-        foreach ($data as $key => $value) {
-            if (is_string($key)) {
-                $out[$key] = $value;
-            }
-        }
 
-        return $out;
+        return collect($data)
+            ->filter(fn ($v, $k) => is_string($k))
+            ->all();
     }
 
     private static function stringifyAuthId(SSOAuthenticatable $user): string

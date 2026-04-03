@@ -9,6 +9,7 @@ use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftOAuthService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -65,8 +66,14 @@ class HandleMicrosoftCallbackController extends Controller
                 'microsoft_entra_sso_issued_at',
             ]);
 
-            $redirectPath = config("microsoft-entra-sso.guards.{$guard}.redirect_after_login", '/');
-            $redirectPath = is_string($redirectPath) && $redirectPath !== '' ? $redirectPath : '/';
+            $guardsConfig = config('microsoft-entra-sso.guards', []);
+            $guardsConfig = is_array($guardsConfig) ? $guardsConfig : [];
+            $guardEntry = Arr::get($guardsConfig, $guard);
+            $redirectPath = '/';
+            if (is_array($guardEntry)) {
+                $path = Arr::get($guardEntry, 'redirect_after_login', '/');
+                $redirectPath = is_string($path) && $path !== '' ? $path : '/';
+            }
 
             return redirect()->intended($redirectPath);
         } catch (SSOException $e) {

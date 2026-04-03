@@ -12,6 +12,7 @@ use CodebarAg\MicrosoftEntraSSO\Services\GuardConfigValidator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Route;
 
 trait HandlesMicrosoftSSO
@@ -75,11 +76,14 @@ trait HandlesMicrosoftSSO
     protected function resolveUser(SSOUser $microsoftUser, string $guard): SSOAuthenticatable
     {
         $guardConfig = app(GuardConfigValidator::class)->guardConfig($guard);
+        $modelClass = Arr::get($guardConfig, 'model');
+        if (! is_string($modelClass) || $modelClass === '') {
+            throw SSOException::guardModelNotConfigured($guard);
+        }
         /** @var class-string<Model&SSOAuthenticatable> $modelClass */
-        $modelClass = $guardConfig['model'];
         $microsoftUserData = $microsoftUser->toArray();
 
-        $microsoftId = $microsoftUserData['id'] ?? null;
+        $microsoftId = Arr::get($microsoftUserData, 'id');
         if (! is_string($microsoftId) || $microsoftId === '') {
             throw SSOException::userNotFound('missing-id');
         }
@@ -93,7 +97,7 @@ trait HandlesMicrosoftSSO
             return $existing;
         }
 
-        $email = $microsoftUserData['email'] ?? null;
+        $email = Arr::get($microsoftUserData, 'email');
         $byEmail = null;
         if (is_string($email) && $email !== '') {
             $byEmail = $modelClass::query()->where('email', $email)->first();

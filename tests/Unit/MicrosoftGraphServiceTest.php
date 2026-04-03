@@ -2,6 +2,7 @@
 
 use CodebarAg\MicrosoftEntraSSO\Contracts\Provider;
 use CodebarAg\MicrosoftEntraSSO\Data\SSOToken;
+use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
 use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftGraphService;
 use CodebarAg\MicrosoftEntraSSO\Tests\TestUser;
 use Illuminate\Http\Client\RequestException;
@@ -143,6 +144,18 @@ it('throws on http error from graph api', function () {
     $this->graphService->getUserProfile($user);
 })->throws(RequestException::class);
 
+it('throws when profile endpoint returns success with non-array json', function () {
+    $user = createTestUserWithIdentity();
+
+    Http::fake([
+        'graph.microsoft.com/v1.0/me*' => Http::response('42', 200, [
+            'Content-Type' => 'application/json',
+        ]),
+    ]);
+
+    $this->graphService->getUserProfile($user);
+})->throws(SSOException::class);
+
 it('uses fallback values when refresh response is partial', function () {
     $user = createTestUserWithIdentity(expired: true);
 
@@ -185,3 +198,15 @@ it('returns empty collection when group payload is malformed', function () {
     $groups = $this->graphService->getUserGroups($user);
     expect($groups)->toHaveCount(0);
 });
+
+it('throws when group endpoint returns success with non-array json', function () {
+    $user = createTestUserWithIdentity();
+
+    Http::fake([
+        'graph.microsoft.com/v1.0/me/memberOf/microsoft.graph.group*' => Http::response('"just-a-string"', 200, [
+            'Content-Type' => 'application/json',
+        ]),
+    ]);
+
+    $this->graphService->getUserGroups($user);
+})->throws(SSOException::class);

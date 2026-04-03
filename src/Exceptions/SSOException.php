@@ -39,6 +39,24 @@ class SSOException extends Exception
         return new self(__('microsoft-entra-sso.error.model_missing_trait', ['model' => $model]));
     }
 
+    public static function guardModelMustBeEloquent(string $model): self
+    {
+        return new self(__('microsoft-entra-sso.error.guard_model_must_be_eloquent', ['model' => $model]));
+    }
+
+    /**
+     * @param  'profile'|'groups'  $kind
+     */
+    public static function invalidGraphResponse(string $kind): self
+    {
+        $key = match ($kind) {
+            'groups' => 'microsoft-entra-sso.error.invalid_graph_groups',
+            default => 'microsoft-entra-sso.error.invalid_graph_profile',
+        };
+
+        return new self(__($key));
+    }
+
     public static function userNotFound(string $microsoftId): self
     {
         return new self(__('microsoft-entra-sso.error.user_not_found', ['microsoft_id' => $microsoftId]));
