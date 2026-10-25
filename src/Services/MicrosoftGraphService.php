@@ -141,16 +141,21 @@ class MicrosoftGraphService
      */
     public function isUserInGroup(SSOAuthenticatable $user, string $groupId): bool
     {
+        $authId = self::stringifyAuthId($user);
+
+        // Include the model class so users of different guards/models sharing
+        // the same primary key never share a cached membership result.
         $cacheKey = sprintf(
-            'microsoft-entra-sso:group-membership:%s:%s',
-            self::stringifyAuthId($user),
+            'microsoft-entra-sso:group-membership:%s:%s:%s',
+            $user::class,
+            $authId,
             $groupId
         );
 
         $ttlRaw = config('microsoft-entra-sso.group_membership_cache_ttl', 60);
         $ttl = is_int($ttlRaw) ? $ttlRaw : (is_numeric($ttlRaw) ? (int) $ttlRaw : 60);
 
-        if ($ttl > 0) {
+        if ($ttl > 0 && $authId !== '') {
             return Cache::remember($cacheKey, $ttl, fn () => $this->resolveGroupMembership($user, $groupId));
         }
 
