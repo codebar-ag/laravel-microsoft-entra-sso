@@ -7,7 +7,9 @@ use CodebarAg\MicrosoftEntraSSO\Data\SSOToken;
 use CodebarAg\MicrosoftEntraSSO\Data\SSOUser;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\TokenExchangeException;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -244,9 +246,18 @@ class MicrosoftOAuthService implements Provider
         $retryTimes = $this->intHttpValue('retry_times', 1);
         $retrySleep = $this->intHttpValue('retry_sleep_ms', 200);
 
+        // Only retry transient failures. Authorization codes and refresh tokens
+        // are single-use, so client errors must not be replayed, and failed
+        // responses are returned so they surface as TokenExchangeException.
         return Http::timeout($timeout)
             ->connectTimeout($connectTimeout)
-            ->retry($retryTimes, $retrySleep)
+            ->retry(
+                $retryTimes,
+                $retrySleep,
+                fn (\Throwable $e): bool => $e instanceof ConnectionException
+                    || ($e instanceof RequestException && $e->response->serverError()),
+                throw: false,
+            )
             ->acceptJson();
     }
 

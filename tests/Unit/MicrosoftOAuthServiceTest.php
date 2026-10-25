@@ -306,3 +306,77 @@ it('throws on missing required configuration values', function () {
         scopes: ['openid'],
     );
 })->throws(SSOException::class);
+
+it('does not retry client errors and reports them as token exchange failures when retries are enabled', function () {
+    config()->set('microsoft-entra-sso.http.retry_times', 3);
+    config()->set('microsoft-entra-sso.http.retry_sleep_ms', 0);
+
+    Http::fake([
+        'login.microsoftonline.com/*' => Http::response([
+            'error' => 'invalid_grant',
+            'error_description' => 'Code already redeemed.',
+        ], 400),
+    ]);
+
+    $service = new MicrosoftOAuthService(
+        tenantId: 'test-tenant',
+        clientId: 'test-client',
+        clientSecret: 'test-secret',
+        redirectUri: 'http://localhost/callback',
+        scopes: ['openid'],
+    );
+
+    expect(fn () => $service->exchangeCodeForTokens('used-code', 'verifier'))
+        ->toThrow(TokenExchangeException::class);
+
+    Http::assertSentCount(1);
+});
+
+it('retries server errors on the token endpoint when retries are enabled', function () {
+    config()->set('microsoft-entra-sso.http.retry_times', 3);
+    config()->set('microsoft-entra-sso.http.retry_sleep_ms', 0);
+
+    Http::fake([
+        'login.microsoftonline.com/*' => Http::sequence()
+            ->push(['error' => 'temporarily_unavailable'], 503)
+            ->push([
+                'access_token' => 'access-123',
+                'refresh_token' => 'refresh-456',
+                'expires_in' => 3600,
+            ]),
+    ]);
+
+    $service = new MicrosoftOAuthService(
+        tenantId: 'test-tenant',
+        clientId: 'test-client',
+        clientSecret: 'test-secret',
+        redirectUri: 'http://localhost/callback',
+        scopes: ['openid'],
+    );
+
+    expect($service->exchangeCodeForTokens('auth-code', 'verifier')->accessToken)->toBe('access-123');
+
+    Http::assertSentCount(2);
+});
+
+it('reports persistent server errors as token exchange failures when retries are enabled', function () {
+    config()->set('microsoft-entra-sso.http.retry_times', 2);
+    config()->set('microsoft-entra-sso.http.retry_sleep_ms', 0);
+
+    Http::fake([
+        'login.microsoftonline.com/*' => Http::response(['error' => 'temporarily_unavailable'], 503),
+    ]);
+
+    $service = new MicrosoftOAuthService(
+        tenantId: 'test-tenant',
+        clientId: 'test-client',
+        clientSecret: 'test-secret',
+        redirectUri: 'http://localhost/callback',
+        scopes: ['openid'],
+    );
+
+    expect(fn () => $service->refreshAccessToken('refresh-token'))
+        ->toThrow(TokenExchangeException::class);
+
+    Http::assertSentCount(2);
+});
