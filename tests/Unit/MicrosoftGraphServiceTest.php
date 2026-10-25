@@ -210,3 +210,20 @@ it('throws when group endpoint returns success with non-array json', function ()
 
     $this->graphService->getUserGroups($user);
 })->throws(SSOException::class);
+
+it('does not follow group pagination links outside of microsoft graph', function () {
+    $user = createTestUserWithIdentity();
+
+    Http::fake([
+        'graph.microsoft.com/v1.0/me/memberOf/microsoft.graph.group*' => Http::response([
+            'value' => [['id' => 'group-1', 'displayName' => 'Admins']],
+            '@odata.nextLink' => 'https://attacker.example.com/v1.0/me/memberOf?$skiptoken=page2',
+        ]),
+        'attacker.example.com/*' => Http::response(['value' => []]),
+    ]);
+
+    expect(fn () => $this->graphService->getUserGroups($user))
+        ->toThrow(SSOException::class);
+
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'attacker.example.com'));
+});

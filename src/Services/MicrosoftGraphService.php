@@ -97,6 +97,12 @@ class MicrosoftGraphService
             $groups = $groups->concat($chunk);
             $next = Arr::get($data, '@odata.nextLink');
             $url = is_string($next) && $next !== '' ? $next : null;
+
+            // The bearer token is attached to every page request, so only
+            // follow pagination links that point back to Microsoft Graph.
+            if ($url !== null && ! str_starts_with($url, self::GRAPH_BASE.'/')) {
+                throw SSOException::invalidGraphResponse('groups');
+            }
         } while ($url);
 
         return $groups;
