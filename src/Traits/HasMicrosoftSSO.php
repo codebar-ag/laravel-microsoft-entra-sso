@@ -22,7 +22,8 @@ trait HasMicrosoftSSO
 
     public static function findByMicrosoftId(string $microsoftId): ?static
     {
-        $morphClass = static::make()->getMorphClass();
+        // Eloquent models are always constructible without arguments.
+        $morphClass = (new static)->getMorphClass(); // @phpstan-ignore new.static
 
         $identity = MicrosoftSSOIdentity::byMicrosoftId($microsoftId)
             ->where('authenticatable_type', $morphClass)
