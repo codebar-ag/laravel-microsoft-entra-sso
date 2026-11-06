@@ -1,8 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Services;
 
 use CodebarAg\MicrosoftEntraSSO\Data\IdTokenClaims;
+use CodebarAg\MicrosoftEntraSSO\Support\Payload;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\TokenExchangeException;
 use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
@@ -21,7 +24,7 @@ use Throwable;
  * OpenID discovery. Keys are cached and re-fetched (at most once per
  * cooldown) when a token references an unknown `kid`.
  */
-class IdTokenValidator
+final class IdTokenValidator
 {
     public const MSA_TENANT_ID = '9188040d-6c67-4c5b-b112-36a304b66dad';
 
@@ -80,7 +83,7 @@ class IdTokenValidator
             throw $this->invalid('The id token header is malformed.');
         }
 
-        return collect($header)->filter(fn ($v, $k) => is_string($k))->all();
+        return Payload::assoc($header);
     }
 
     /**
@@ -101,7 +104,7 @@ class IdTokenValidator
 
         $claims = json_decode((string) json_encode($decoded), true);
 
-        return is_array($claims) ? collect($claims)->filter(fn ($v, $k) => is_string($k))->all() : [];
+        return Payload::assoc($claims);
     }
 
     /**
@@ -232,11 +235,7 @@ class IdTokenValidator
             throw $this->invalid('The signing keys could not be loaded.');
         }
 
-        return collect($keys)
-            ->filter(fn ($key) => is_array($key))
-            ->map(fn (array $key) => collect($key)->filter(fn ($v, $k) => is_string($k))->all())
-            ->values()
-            ->all();
+        return Payload::objects($keys);
     }
 
     protected function http(): PendingRequest

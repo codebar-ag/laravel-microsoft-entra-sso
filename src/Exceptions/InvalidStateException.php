@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Exceptions;
 
-class InvalidStateException extends SSOException
+final class InvalidStateException extends SSOException
 {
     public static function make(): self
     {

@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 use CodebarAg\MicrosoftEntraSSO\Contracts\Factory;
 use CodebarAg\MicrosoftEntraSSO\Contracts\Provider;
 use CodebarAg\MicrosoftEntraSSO\MicrosoftEntraSSOManager;
-use CodebarAg\MicrosoftEntraSSO\MicrosoftEntraSSOServiceProvider;
+use CodebarAg\MicrosoftEntraSSO\EntraSsoServiceProvider;
 use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftOAuthService;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
@@ -38,7 +40,7 @@ it('skips publishables when not running in console', function () {
     $app = Mockery::mock(Application::class)->makePartial();
     $app->shouldReceive('runningInConsole')->andReturn(false);
 
-    $provider = new MicrosoftEntraSSOServiceProvider($app);
+    $provider = new EntraSsoServiceProvider($app);
 
     $reflection = new ReflectionMethod($provider, 'registerPublishables');
     $reflection->setAccessible(true);
@@ -55,7 +57,7 @@ it('loads package json translations', function () {
 
 it('registers translation publish paths', function () {
     $paths = ServiceProvider::pathsToPublish(
-        MicrosoftEntraSSOServiceProvider::class,
+        EntraSsoServiceProvider::class,
         'microsoft-entra-sso-translations',
     );
 

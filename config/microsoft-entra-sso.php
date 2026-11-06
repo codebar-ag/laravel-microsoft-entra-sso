@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Models\User;
 
 return [
@@ -9,9 +11,17 @@ return [
     | Microsoft Entra ID (Azure AD) Credentials
     |--------------------------------------------------------------------------
     |
-    | Register an application in the Azure Portal / Entra admin center and
-    | copy the tenant ID, client (application) ID, and client secret here.
-    | The redirect URI must match the one configured in Azure exactly.
+    | Register an application in the Entra admin center and copy the client
+    | (application) ID and client secret here.
+    |
+    | tenant_id is either the GUID of ONE directory (single directory app: only
+    | people of that directory can sign in) or "organizations" / "common" /
+    | "consumers" (customer directories: people of any directory can sign in,
+    | restrict them with a login gate).
+    |
+    | The redirect URI registered in Entra is derived from the route
+    | {prefix}/{guard}/callback and the host of the request, see
+    | allowed_redirect_hosts.
     |
     */
 
@@ -21,52 +31,47 @@ return [
 
     'client_secret' => env('MICROSOFT_ENTRA_SSO_CLIENT_SECRET'),
 
-    'redirect_uri' => env('MICROSOFT_ENTRA_SSO_REDIRECT_URI'),
-
     /*
     |--------------------------------------------------------------------------
     | OAuth Scopes
     |--------------------------------------------------------------------------
     |
-    | The scopes requested during the OAuth2 authorization flow. The defaults
-    | are sufficient for SSO login. Add additional Microsoft Graph scopes
-    | if your application needs to access Microsoft APIs on behalf of the user.
+    | The scopes requested during the OAuth2 authorization flow. "openid" is
+    | required. The defaults are sufficient for SSO login. Add Microsoft Graph
+    | scopes only when you need them: GroupMember.Read.All needs admin consent
+    | in every customer directory.
     |
     */
 
-    'scopes' => ['openid', 'profile', 'email', 'User.Read', 'GroupMember.Read.All'],
+    'scopes' => ['openid', 'profile', 'email', 'User.Read'],
 
     /*
     |--------------------------------------------------------------------------
     | Auto-Registration
     |--------------------------------------------------------------------------
     |
-    | When enabled, users authenticating via Microsoft SSO for the first time
-    | will be automatically created in your database. Disable this if you
-    | only want to allow SSO for pre-existing users.
+    | When enabled, a person signing in for the first time is created through
+    | your UserProvisioner. Disabled by default: only existing users (or users
+    | linked by email, see email_linking) can sign in.
     |
     */
 
-    'auto_register' => true,
+    'auto_register' => (bool) env('MICROSOFT_ENTRA_SSO_AUTO_REGISTER', false),
 
     /*
     |--------------------------------------------------------------------------
     | Id Token Validation
     |--------------------------------------------------------------------------
     |
-    | When the token response contains an id token it is validated (RS256
-    | signature against the Entra JWKS, audience, issuer vs. tid, exp/nbf,
-    | nonce) and the user's tenant id (tid) and object id (oid) are exposed.
-    | Validation fails closed. Set `require` to true to also reject token
-    | responses without an id token (recommended for multi-tenant apps).
-    | Keys are cached for jwks_cache_ttl seconds and re-fetched at most once
-    | per jwks_refresh_cooldown seconds when a token uses an unknown key id.
+    | The id token is always required and validated (RS256 signature against
+    | the Entra JWKS, audience, issuer vs. tid, exp/nbf/iat, nonce); its tenant
+    | (tid) and object id (oid) are the identity of the person. Keys are cached
+    | for jwks_cache_ttl seconds and re-fetched at most once per
+    | jwks_refresh_cooldown seconds when a token uses an unknown key id.
     |
     */
 
     'id_token' => [
-        'validate' => true,
-        'require' => (bool) env('MICROSOFT_ENTRA_SSO_REQUIRE_ID_TOKEN', false),
         'leeway_seconds' => 60,
         'jwks_cache_ttl' => 86400,
         'jwks_refresh_cooldown' => 60,
@@ -92,15 +97,17 @@ return [
     |--------------------------------------------------------------------------
     |
     | How an existing local user is matched to a Microsoft sign-in by email:
-    |   'always'           link by email (default, historic behaviour)
+    |   'never'            never link by email (default)
     |   'same_tenant_only' link only if the user's Microsoft identity has the same tenant id
-    |   'never'            never link by email
+    |   'always'           link by email; only allowed when tenant_id is a single directory GUID
     |
-    | Multi-tenant apps must not use 'always' (see README, "nOAuth").
+    | An email address in a foreign directory is not proof of ownership
+    | (nOAuth, see README), so 'always' with "organizations", "common" or
+    | "consumers" is a configuration error.
     |
     */
 
-    'email_linking' => env('MICROSOFT_ENTRA_SSO_EMAIL_LINKING', 'always'),
+    'email_linking' => env('MICROSOFT_ENTRA_SSO_EMAIL_LINKING', 'never'),
 
     /*
     |--------------------------------------------------------------------------
@@ -118,37 +125,43 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | OAuth Flow Behavior
-    |--------------------------------------------------------------------------
-    |
-    | Enable stateless mode for API-style integrations where session-backed
-    | state validation is not available. When stateless is disabled, callback
-    | requests must match both the stored OAuth state and guard.
-    |
-    */
-
-    'stateless' => false,
-
-    /*
-    |--------------------------------------------------------------------------
     | Security Hardening
     |--------------------------------------------------------------------------
     |
-    | state_ttl_seconds controls how long OAuth state/code verifier values
-    | remain valid in session. allowed_redirect_hosts can be used to restrict
-    | redirect URIs to known hostnames.
+    | state_ttl_seconds controls how long the sign-in state (state, PKCE
+    | verifier, nonce) stays valid in the session. allowed_redirect_hosts
+    | restricts the host of the derived redirect URI (empty allows any host,
+    | set it in production).
     |
     */
 
     'state_ttl_seconds' => 300,
+
     'allowed_redirect_hosts' => [],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Errors and Login Page
+    |--------------------------------------------------------------------------
+    |
+    | The package ships no UI. A failed sign-in redirects to the route named by
+    | login_route (or "/" when it does not exist) and flashes the translated
+    | error message under error_flash_key.
+    |
+    */
+
+    'error_flash_key' => 'microsoft_entra_sso_error',
+
+    'login_route' => 'login',
 
     /*
     |--------------------------------------------------------------------------
     | HTTP Client Options
     |--------------------------------------------------------------------------
     |
-    | Configure request behavior for OAuth and Graph calls.
+    | Configure request behavior for OAuth, JWKS and Graph calls. Only
+    | transient failures (connection errors, 5xx) are retried, because
+    | authorization codes and refresh tokens are single use.
     |
     */
 
@@ -161,12 +174,29 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Microsoft Graph
+    |--------------------------------------------------------------------------
+    |
+    | group_membership_cache_ttl caches group membership checks per user for
+    | that many seconds (0 disables). The refresh lock serialises concurrent
+    | access token refreshes of the same user.
+    |
+    */
+
+    'graph' => [
+        'group_membership_cache_ttl' => 60,
+        'refresh_lock_seconds' => 10,
+        'refresh_lock_wait_seconds' => 5,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Guards
     |--------------------------------------------------------------------------
     |
     | Define which authentication guards can use Microsoft SSO. Each guard
     | maps to an Eloquent model and a post-login redirect path. The model
-    | must use the HasMicrosoftSSO trait.
+    | must implement the SsoUser contract (use the HasMicrosoftIdentity trait).
     |
     */
 

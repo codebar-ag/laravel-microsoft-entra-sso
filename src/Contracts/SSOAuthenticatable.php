@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Contracts;
 
 use CodebarAg\MicrosoftEntraSSO\Models\MicrosoftSSOIdentity;
@@ -13,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
 interface SSOAuthenticatable extends Authenticatable
 {
     /**
-     * @return MorphOne<MicrosoftSSOIdentity, Model>
+     * @return MorphOne<MicrosoftSSOIdentity, covariant Model>
      */
     public function microsoftIdentity(): MorphOne;
 

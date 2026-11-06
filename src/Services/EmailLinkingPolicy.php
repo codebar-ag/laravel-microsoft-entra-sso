@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Services;
 
 use CodebarAg\MicrosoftEntraSSO\Contracts\SSOAuthenticatable;
@@ -23,7 +25,7 @@ use Illuminate\Support\Arr;
  * Apps that override findOrCreateFromMicrosoft() should call assertCanLink()
  * before linking an existing user found by email.
  */
-class EmailLinkingPolicy
+final class EmailLinkingPolicy
 {
     public const ALWAYS = 'always';
 

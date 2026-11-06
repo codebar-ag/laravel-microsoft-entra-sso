@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Traits;
 
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
@@ -14,7 +16,7 @@ use Illuminate\Support\Str;
 trait HasMicrosoftSSO
 {
     /**
-     * @return MorphOne<MicrosoftSSOIdentity, Model>
+     * @return MorphOne<MicrosoftSSOIdentity, $this>
      */
     public function microsoftIdentity(): MorphOne
     {

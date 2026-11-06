@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use CodebarAg\MicrosoftEntraSSO\Contracts\Provider;
 use CodebarAg\MicrosoftEntraSSO\Data\SSOToken;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;

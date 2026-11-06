@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use CodebarAg\MicrosoftEntraSSO\Exceptions\TokenExchangeException;
 use CodebarAg\MicrosoftEntraSSO\Services\IdTokenValidator;
 use CodebarAg\MicrosoftEntraSSO\Tests\Support\EntraFake;

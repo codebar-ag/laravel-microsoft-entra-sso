@@ -2,13 +2,23 @@ includes:
     - vendor/larastan/larastan/extension.neon
 
 parameters:
-    level: 9
-    # Only package source is analysed here; Pest feature tests use Laravel helpers
-    # (e.g. withSession) and expect() generics that do not pass Larastan at level 9.
+    level: max
     paths:
         - src
+        - tests
     tmpDir: var/phpstan
-    treatPhpDocTypesAsCertain: false
-    ignoreErrors:
-        # Eloquent relation generics use an invariant declaring model; morphOne() returns MorphOne<Related, $this>.
-        - '#microsoftIdentity\(\) should return#'
+    # Legacy closure-style Pest tests cannot be analysed at max ($this is the Pest TestCall);
+    # they are removed together with the v13 code they cover and this list is empty after PR 5.
+    excludePaths:
+        analyse:
+            - tests/Feature
+            - tests/Unit/ExceptionTest.php
+            - tests/Unit/FacadeTest.php
+            - tests/Unit/HasMicrosoftSSOTest.php
+            - tests/Unit/IdTokenValidatorTest.php
+            - tests/Unit/MicrosoftGraphServiceTest.php
+            - tests/Unit/MicrosoftOAuthServiceTest.php
+            - tests/Unit/ServiceProviderTest.php
+            - tests/Unit/TenantDataTest.php
+            - tests/Pest.php
+            - tests/Support

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\TokenExchangeException;
 use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftOAuthService;

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Http\Controllers\Concerns;
 
 use CodebarAg\MicrosoftEntraSSO\Contracts\LoginGate;
@@ -12,7 +14,7 @@ use CodebarAg\MicrosoftEntraSSO\Exceptions\InvalidStateException;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\LoginDeniedException;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
 use CodebarAg\MicrosoftEntraSSO\Services\EmailLinkingPolicy;
-use CodebarAg\MicrosoftEntraSSO\Services\GuardConfigValidator;
+use CodebarAg\MicrosoftEntraSSO\Config\EntraConfig;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,7 +25,7 @@ trait HandlesMicrosoftSSO
 {
     protected function validateGuard(string $guard): void
     {
-        app(GuardConfigValidator::class)->guardConfig($guard);
+        app(EntraConfig::class)->guard($guard);
     }
 
     protected function validateState(Request $request, string $guard): void
@@ -104,19 +106,15 @@ trait HandlesMicrosoftSSO
             throw SSOException::invalidLoginGate(is_string($gateClass) ? $gateClass : get_debug_type($gateClass));
         }
 
-        if (! app($gateClass)->allows($microsoftUser, $guard)) {
+        $gate = app($gateClass);
+        if (! $gate instanceof LoginGate || ! $gate->allows($microsoftUser, $guard)) {
             throw LoginDeniedException::byGate();
         }
     }
 
     protected function findOrRegisterUser(SSOUser $microsoftUser, string $guard): SSOAuthenticatable
     {
-        $guardConfig = app(GuardConfigValidator::class)->guardConfig($guard);
-        $modelClass = Arr::get($guardConfig, 'model');
-        if (! is_string($modelClass) || $modelClass === '') {
-            throw SSOException::guardModelNotConfigured($guard);
-        }
-        /** @var class-string<Model&SSOAuthenticatable> $modelClass */
+        $modelClass = app(EntraConfig::class)->guard($guard)->model;
         $microsoftUserData = $microsoftUser->toArray();
 
         $microsoftId = Arr::get($microsoftUserData, 'id');

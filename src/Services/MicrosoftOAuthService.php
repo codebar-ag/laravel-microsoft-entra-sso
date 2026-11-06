@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Services;
 
 use CodebarAg\MicrosoftEntraSSO\Contracts\Provider;
@@ -7,6 +9,7 @@ use CodebarAg\MicrosoftEntraSSO\Data\SSOToken;
 use CodebarAg\MicrosoftEntraSSO\Data\SSOUser;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\TokenExchangeException;
+use CodebarAg\MicrosoftEntraSSO\Support\Payload;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
@@ -14,7 +17,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
-class MicrosoftOAuthService implements Provider
+final class MicrosoftOAuthService implements Provider
 {
     protected string $authorizeEndpoint;
 
@@ -127,7 +130,7 @@ class MicrosoftOAuthService implements Provider
             );
         }
 
-        return SSOToken::fromArray(self::jsonAsAssoc($data));
+        return SSOToken::fromArray(Payload::assoc($data));
     }
 
     public function getUserFromToken(string $accessToken): SSOUser
@@ -151,7 +154,7 @@ class MicrosoftOAuthService implements Provider
             );
         }
 
-        return SSOUser::fromGraphPayload(self::jsonAsAssoc($data));
+        return SSOUser::fromGraphPayload(Payload::assoc($data));
     }
 
     /**
@@ -226,7 +229,7 @@ class MicrosoftOAuthService implements Provider
             );
         }
 
-        return SSOToken::fromArray(self::jsonAsAssoc($data));
+        return SSOToken::fromArray(Payload::assoc($data));
     }
 
     public function getRedirectUri(): ?string
@@ -318,17 +321,4 @@ class MicrosoftOAuthService implements Provider
         return $default;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private static function jsonAsAssoc(mixed $data): array
-    {
-        if (! is_array($data)) {
-            return [];
-        }
-
-        return collect($data)
-            ->filter(fn ($v, $k) => is_string($k))
-            ->all();
-    }
 }

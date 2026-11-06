@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Http\Controllers;
 
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
@@ -10,7 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
 
-class RedirectToMicrosoftController extends Controller
+final class RedirectToMicrosoftController extends Controller
 {
     use HandlesMicrosoftSSO;
 

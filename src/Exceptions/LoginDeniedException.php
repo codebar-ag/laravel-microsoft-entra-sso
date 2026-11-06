@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Exceptions;
 
-class LoginDeniedException extends SSOException
+final class LoginDeniedException extends SSOException
 {
     public const REASON_LOGIN_GATE = 'login_gate';
 

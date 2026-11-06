@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Data;
 
 /**
  * The verified claims of a Microsoft Entra id token.
  */
-class IdTokenClaims
+final class IdTokenClaims
 {
     /**
      * @param  array<string, mixed>  $raw

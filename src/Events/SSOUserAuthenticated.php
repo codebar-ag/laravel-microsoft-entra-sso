@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Events;
 
 use CodebarAg\MicrosoftEntraSSO\Contracts\SSOAuthenticatable;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class SSOUserAuthenticated
+final class SSOUserAuthenticated
 {
     use Dispatchable, SerializesModels;
 
