@@ -48,9 +48,13 @@ jobs:
         if: matrix.stability == 'prefer-lowest'
         run: vendor/bin/pest --no-coverage
 
+      - name: Run type coverage
+        if: matrix.stability == 'prefer-stable'
+        run: vendor/bin/pest --type-coverage --min=100
+
       - name: Run tests with the coverage threshold
         if: matrix.stability == 'prefer-stable'
-        run: vendor/bin/pest --coverage --min=90
+        run: vendor/bin/pest --coverage --min=95
 
       - name: Store log artifacts
         if: failure()

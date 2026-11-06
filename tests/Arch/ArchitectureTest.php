@@ -12,25 +12,14 @@ use ReflectionClass;
 use SplFileInfo;
 
 /**
- * Architecture rules, checked over the source tree. Legacy v13 paths are listed in LEGACY and
- * removed as they are replaced; the list is empty after PR 5.
+ * Architecture rules, checked over the source tree.
  */
 final class ArchitectureTest extends TestCase
 {
-    private const array LEGACY = [
-        'Services/',
-        'Http/Controllers/',
-        'Traits/',
-        'Models/',
-        'Support/UsesHasMicrosoftSSOTraitForStaticAnalysis.php',
-        'MicrosoftEntraSSOManager.php',
-        'Exceptions/SSOException.php',
-    ];
-
     /**
      * @return array<string, string> relative path => contents
      */
-    private static function sources(bool $includeLegacy = false): array
+    private static function sources(): array
     {
         $root = dirname(__DIR__, 2).'/src/';
         $files = [];
@@ -44,30 +33,16 @@ final class ArchitectureTest extends TestCase
                 continue;
             }
             $relative = substr($path, strlen($root));
-            if (! $includeLegacy && self::isLegacy($relative)) {
-                continue;
-            }
             $files[$relative] = (string) file_get_contents($path);
         }
 
         return $files;
     }
 
-    private static function isLegacy(string $relative): bool
-    {
-        foreach (self::LEGACY as $prefix) {
-            if (str_starts_with($relative, $prefix)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     #[Test]
     public function every_source_file_declares_strict_types(): void
     {
-        foreach (self::sources(true) as $path => $code) {
+        foreach (self::sources() as $path => $code) {
             self::assertStringContainsString('declare(strict_types=1);', $code, $path);
         }
     }
@@ -123,7 +98,7 @@ final class ArchitectureTest extends TestCase
     #[Test]
     public function there_is_no_debugging_leftover(): void
     {
-        foreach (self::sources(true) as $path => $code) {
+        foreach (self::sources() as $path => $code) {
             self::assertSame(0, preg_match('/\b(dd|dump|var_dump|ray)\(/', $code), $path);
         }
     }

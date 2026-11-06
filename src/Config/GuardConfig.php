@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CodebarAg\MicrosoftEntraSSO\Config;
 
-use CodebarAg\MicrosoftEntraSSO\Contracts\SSOAuthenticatable;
+use CodebarAg\MicrosoftEntraSSO\Contracts\SsoUser;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 final readonly class GuardConfig
 {
     /**
-     * @param  class-string<Model&SSOAuthenticatable>  $model
+     * @param  class-string<Model&SsoUser>  $model
      */
     public function __construct(
         public string $name,

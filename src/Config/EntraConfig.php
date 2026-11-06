@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace CodebarAg\MicrosoftEntraSSO\Config;
 
 use CodebarAg\MicrosoftEntraSSO\Contracts\LoginGate;
-use CodebarAg\MicrosoftEntraSSO\Contracts\SSOAuthenticatable;
+use CodebarAg\MicrosoftEntraSSO\Contracts\SsoUser;
+use CodebarAg\MicrosoftEntraSSO\Contracts\UserProvisioner;
 use CodebarAg\MicrosoftEntraSSO\Enums\EmailLinkingMode;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\ConfigurationException;
 use Illuminate\Database\Eloquent\Model;
@@ -20,6 +21,7 @@ final readonly class EntraConfig
     /**
      * @param  list<string>  $scopes
      * @param  class-string<LoginGate>|null  $loginGate
+     * @param  class-string<UserProvisioner>|null  $userProvisioner
      * @param  list<string>  $allowedRedirectHosts
      * @param  array<string, GuardConfig>  $guards
      */
@@ -31,6 +33,7 @@ final readonly class EntraConfig
         public bool $autoRegister,
         public EmailLinkingMode $emailLinking,
         public ?string $loginGate,
+        public ?string $userProvisioner,
         public int $stateTtlSeconds,
         public array $allowedRedirectHosts,
         public string $errorFlashKey,
@@ -63,6 +66,12 @@ final readonly class EntraConfig
             throw ConfigurationException::invalid('email_linking', '"always" is only allowed when tenant_id is a single directory GUID (nOAuth), use "same_tenant_only" or "never".');
         }
 
+        $autoRegister = $reader->bool('auto_register');
+        $userProvisioner = self::userProvisioner($reader);
+        if ($autoRegister && $userProvisioner === null) {
+            throw ConfigurationException::invalid('user_provisioner', 'is required when auto_register is true.');
+        }
+
         $idToken = $reader->section('id_token');
         $http = $reader->section('http');
         $graph = $reader->section('graph');
@@ -72,9 +81,10 @@ final readonly class EntraConfig
             clientId: $reader->string('client_id'),
             clientSecret: $reader->string('client_secret'),
             scopes: $scopes,
-            autoRegister: $reader->bool('auto_register'),
+            autoRegister: $autoRegister,
             emailLinking: $emailLinking,
             loginGate: self::loginGate($reader),
+            userProvisioner: $userProvisioner,
             stateTtlSeconds: $reader->int('state_ttl_seconds', 1),
             allowedRedirectHosts: $reader->stringList('allowed_redirect_hosts'),
             errorFlashKey: $reader->string('error_flash_key'),
@@ -130,6 +140,24 @@ final readonly class EntraConfig
     }
 
     /**
+     * @return class-string<UserProvisioner>|null
+     */
+    private static function userProvisioner(ConfigReader $reader): ?string
+    {
+        $class = $reader->optionalString('user_provisioner');
+
+        if ($class === null) {
+            return null;
+        }
+
+        if (! is_a($class, UserProvisioner::class, true)) {
+            throw ConfigurationException::invalid('user_provisioner', "[{$class}] must be a class implementing ".UserProvisioner::class.'.');
+        }
+
+        return $class;
+    }
+
+    /**
      * @return array<string, GuardConfig>
      */
     private static function guards(ConfigReader $reader): array
@@ -139,10 +167,10 @@ final readonly class EntraConfig
         foreach ($reader->sections('guards') as $name => $section) {
             $model = $section->string('model');
 
-            if (! is_a($model, Model::class, true) || ! is_a($model, SSOAuthenticatable::class, true)) {
+            if (! is_a($model, Model::class, true) || ! is_a($model, SsoUser::class, true)) {
                 throw ConfigurationException::invalid(
                     $section->path('model'),
-                    "[{$model}] must be an Eloquent model implementing ".SSOAuthenticatable::class.'.',
+                    "[{$model}] must be an Eloquent model implementing ".SsoUser::class.'.',
                 );
             }
 

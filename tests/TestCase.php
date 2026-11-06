@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace CodebarAg\MicrosoftEntraSSO\Tests;
 
 use CodebarAg\MicrosoftEntraSSO\EntraSsoServiceProvider;
-use CodebarAg\MicrosoftEntraSSO\Models\MicrosoftSSOIdentity;
-use CodebarAg\MicrosoftEntraSSO\Tests\Support\EntraFake;
+use CodebarAg\MicrosoftEntraSSO\Flow\CallbackParameters;
+use CodebarAg\MicrosoftEntraSSO\Flow\StartSignIn;
 use CodebarAg\MicrosoftEntraSSO\Tests\Support\FakeEntra;
+use CodebarAg\MicrosoftEntraSSO\Tests\Support\TestProvisioner;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Client\Factory as HttpFactory;
+use Illuminate\Session\ArraySessionHandler;
+use Illuminate\Session\Store;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use LogicException;
@@ -37,6 +40,40 @@ abstract class TestCase extends BaseTestCase
         return new FakeEntra($this->container()->make(HttpFactory::class));
     }
 
+    /**
+     * Starts a sign-in and fakes Entra so the callback succeeds.
+     *
+     * @param  array<string, mixed>  $claims  id token claim overrides
+     * @param  array<string, mixed>  $graph
+     * @param  array<string, mixed>  $tokenResponse
+     * @return array{Store, CallbackParameters}
+     */
+    protected function begin(array $claims = [], array $graph = [], array $tokenResponse = [], string $guard = 'web'): array
+    {
+        $session = new Store('test', new ArraySessionHandler(120));
+        $flow = $this->container()->make(StartSignIn::class)->handle($session, $guard)->flow;
+
+        $entra = $this->entra();
+        $entra->fake(array_merge(['id_token' => $entra->idToken($claims + ['nonce' => $flow->nonce])], $tokenResponse), $graph);
+
+        return [$session, new CallbackParameters('auth-code', $flow->state)];
+    }
+
+    /**
+     * @param  array<string, mixed>  $identity
+     */
+    protected function userWithIdentity(string $email = 'john@example.com', ?string $tenant = FakeEntra::TENANT, string $oid = FakeEntra::OID, array $identity = []): TestUser
+    {
+        $user = TestUser::create(['name' => 'Existing', 'email' => $email, 'password' => bcrypt('x')]);
+        $user->microsoftIdentity()->create(array_merge([
+            'microsoft_id' => $oid,
+            'entra_tenant_id' => $tenant,
+            'linked_at' => now(),
+        ], $identity));
+
+        return $user;
+    }
+
     protected function http(): HttpFactory
     {
         return $this->container()->make(HttpFactory::class);
@@ -56,12 +93,12 @@ abstract class TestCase extends BaseTestCase
 
     protected function defineEnvironment($app): void
     {
-        $app['config']->set('microsoft-entra-sso.tenant_id', EntraFake::TENANT);
+        $app['config']->set('microsoft-entra-sso.tenant_id', FakeEntra::TENANT);
         $app['config']->set('microsoft-entra-sso.client_id', 'test-client-id');
         $app['config']->set('microsoft-entra-sso.client_secret', 'test-client-secret');
-        $app['config']->set('microsoft-entra-sso.redirect_uri', 'http://localhost/sso/microsoft/web/callback');
         $app['config']->set('microsoft-entra-sso.scopes', ['openid', 'profile', 'email', 'User.Read']);
         $app['config']->set('microsoft-entra-sso.auto_register', true);
+        $app['config']->set('microsoft-entra-sso.user_provisioner', TestProvisioner::class);
         $app['config']->set('microsoft-entra-sso.email_linking', 'always');
         $app['config']->set('microsoft-entra-sso.state_ttl_seconds', 300);
         $app['config']->set('microsoft-entra-sso.http', [
@@ -113,6 +150,5 @@ abstract class TestCase extends BaseTestCase
             $table->timestamps();
         });
 
-        MicrosoftSSOIdentity::forgetTenantColumnCheck();
     }
 }

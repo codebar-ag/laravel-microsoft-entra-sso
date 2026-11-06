@@ -40,7 +40,7 @@ final class FakeEntra
         }
 
         $resource = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
-        if ($resource === false || ! openssl_pkey_export($resource, $private)) {
+        if ($resource === false || ! openssl_pkey_export($resource, $private) || ! is_string($private)) {
             throw new RuntimeException('Could not generate an RSA key.');
         }
         $details = openssl_pkey_get_details($resource);

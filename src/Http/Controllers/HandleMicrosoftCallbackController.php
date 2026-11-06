@@ -4,108 +4,26 @@ declare(strict_types=1);
 
 namespace CodebarAg\MicrosoftEntraSSO\Http\Controllers;
 
-use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
-use CodebarAg\MicrosoftEntraSSO\Exceptions\TokenExchangeException;
-use CodebarAg\MicrosoftEntraSSO\Http\Controllers\Concerns\HandlesMicrosoftSSO;
-use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftOAuthService;
+use CodebarAg\MicrosoftEntraSSO\Config\EntraConfig;
+use CodebarAg\MicrosoftEntraSSO\Exceptions\SignInFailure;
+use CodebarAg\MicrosoftEntraSSO\Flow\CompleteSignIn;
+use CodebarAg\MicrosoftEntraSSO\Http\LoginRedirector;
+use CodebarAg\MicrosoftEntraSSO\Http\Requests\CallbackRequest;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Routing\Controller;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
-final class HandleMicrosoftCallbackController extends Controller
+final readonly class HandleMicrosoftCallbackController
 {
-    use HandlesMicrosoftSSO;
-
-    public function __construct(
-        protected MicrosoftOAuthService $oauthService,
-    ) {}
-
-    public function __invoke(Request $request, string $guard = 'web'): RedirectResponse
+    public function __invoke(CallbackRequest $request, string $guard, EntraConfig $config, CompleteSignIn $complete, LoginRedirector $redirector): RedirectResponse
     {
+        $guardConfig = $config->findGuard($guard) ?? throw new NotFoundHttpException;
+
         try {
-            $this->validateGuard($guard);
-            $this->validateState($request, $guard);
-
-            if ($request->has('error')) {
-                $err = $request->input('error', 'unknown_error');
-                $desc = $request->input('error_description', '');
-                throw TokenExchangeException::failed(
-                    is_string($err) ? $err : 'unknown_error',
-                    is_string($desc) ? $desc : '',
-                );
-            }
-
-            $code = $request->input('code');
-            if (! is_string($code) || $code === '') {
-                throw TokenExchangeException::missingAuthorizationCode();
-            }
-
-            $codeVerifier = (bool) config('microsoft-entra-sso.stateless', false)
-                ? self::stringFromInput($request->input('code_verifier', ''))
-                : $request->session()->pull('microsoft_entra_sso_code_verifier');
-
-            if (! is_string($codeVerifier) || $codeVerifier === '') {
-                throw TokenExchangeException::missingCodeVerifier();
-            }
-
-            // Absent for flows started before the nonce existed; then the nonce check is skipped.
-            $nonce = (bool) config('microsoft-entra-sso.stateless', false)
-                ? null
-                : $request->session()->pull('microsoft_entra_sso_nonce');
-            $nonce = is_string($nonce) && $nonce !== '' ? $nonce : null;
-
-            $this->oauthService->setRedirectUri($this->getCallbackUrl($guard));
-
-            $tokens = $this->oauthService->exchangeCodeForTokens($code, $codeVerifier);
-            $microsoftUser = $this->oauthService->getUserFromTokens($tokens, $nonce);
-
-            $user = $this->resolveUser($microsoftUser, $guard);
-
-            Auth::guard($guard)->login($user, remember: true);
-
-            $request->session()->regenerate();
-            $request->session()->forget([
-                'microsoft_entra_sso_state',
-                'microsoft_entra_sso_code_verifier',
-                'microsoft_entra_sso_guard',
-                'microsoft_entra_sso_issued_at',
-                'microsoft_entra_sso_nonce',
-            ]);
-
-            $guardsConfig = config('microsoft-entra-sso.guards', []);
-            $guardsConfig = is_array($guardsConfig) ? $guardsConfig : [];
-            $guardEntry = Arr::get($guardsConfig, $guard);
-            $redirectPath = '/';
-            if (is_array($guardEntry)) {
-                $path = Arr::get($guardEntry, 'redirect_after_login', '/');
-                $redirectPath = is_string($path) && $path !== '' ? $path : '/';
-            }
-
-            return redirect()->intended($redirectPath);
-        } catch (SSOException $e) {
-            Log::warning('Microsoft Entra SSO callback failed', [
-                'guard' => $guard,
-                'error' => $e->getMessage(),
-            ]);
-
-            return $this->redirectToLoginWithError($e->getMessage());
-        } catch (\Throwable $e) {
-            Log::error('Microsoft Entra SSO unexpected callback error', [
-                'guard' => $guard,
-                'exception' => $e,
-            ]);
-
-            return $this->redirectToLoginWithError(
-                __('microsoft-entra-sso.error.unexpected_callback'),
-            );
+            $complete->handle($request->session(), $guard, $request->parameters());
+        } catch (SignInFailure $failure) {
+            return $redirector->failed($failure, $guard);
         }
-    }
 
-    private static function stringFromInput(mixed $value): string
-    {
-        return is_string($value) ? $value : '';
+        return redirect()->intended($guardConfig->redirectAfterLogin);
     }
 }

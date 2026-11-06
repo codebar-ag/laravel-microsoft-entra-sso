@@ -4,24 +4,17 @@ declare(strict_types=1);
 
 namespace CodebarAg\MicrosoftEntraSSO\Tests\Support;
 
+use CodebarAg\MicrosoftEntraSSO\Config\GuardConfig;
 use CodebarAg\MicrosoftEntraSSO\Contracts\LoginGate;
-use CodebarAg\MicrosoftEntraSSO\Data\SSOUser;
+use CodebarAg\MicrosoftEntraSSO\Identity\SignIn;
 
 /**
- * Only lets the allowed tenants in; remembers what it was asked.
+ * Only lets the configured tenants in.
  */
 final class TenantGate implements LoginGate
 {
-    /** @var array<int, array{SSOUser, string}> */
-    public static array $calls = [];
-
-    /** @var array<int, string> */
-    public static array $allowedTenants = [EntraFake::TENANT];
-
-    public function allows(SSOUser $user, string $guard): bool
+    public function allows(SignIn $signIn, GuardConfig $guard): bool
     {
-        self::$calls[] = [$user, $guard];
-
-        return in_array($user->tenantId, self::$allowedTenants, true);
+        return $signIn->identity->tenantId === FakeEntra::TENANT;
     }
 }
