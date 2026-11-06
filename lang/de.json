@@ -22,5 +22,12 @@
     "microsoft-entra-sso.error.token_exchange_failed_with_description": "Token-Austausch fehlgeschlagen: :error - :description",
     "microsoft-entra-sso.error.missing_authorization_code": "Der Autorisierungscode fehlt in der Callback-Anfrage.",
     "microsoft-entra-sso.error.missing_code_verifier": "Der PKCE-Code-Verifier fehlt in der Session. Bitte starten Sie den Anmeldeablauf erneut.",
-    "microsoft-entra-sso.error.not_configured": "Microsoft SSO ist nicht konfiguriert."
+    "microsoft-entra-sso.error.not_configured": "Microsoft SSO ist nicht konfiguriert.",
+    "microsoft-entra-sso.error.login_denied": "Ihr Microsoft-Konto darf sich bei dieser Anwendung nicht anmelden.",
+    "microsoft-entra-sso.error.email_linking_disabled": "Ein Konto mit dieser E-Mail-Adresse existiert bereits. Bitte melden Sie sich mit Ihrer bisherigen Methode an und verknuepfen Sie Ihr Microsoft-Konto in Ihrem Profil.",
+    "microsoft-entra-sso.error.email_linking_tenant_mismatch": "Ein Konto mit dieser E-Mail-Adresse existiert bereits, ist aber nicht mit Ihrer Microsoft-Organisation verknuepft. Bitte melden Sie sich mit Ihrer bisherigen Methode an und verknuepfen Sie Ihr Microsoft-Konto in Ihrem Profil.",
+    "microsoft-entra-sso.error.identity_tenant_mismatch": "Diese Microsoft-Identitaet ist bereits mit einer anderen Microsoft-Organisation verknuepft.",
+    "microsoft-entra-sso.error.invalid_login_gate": "Das konfigurierte Login-Gate [:class] existiert nicht oder implementiert den LoginGate-Contract nicht.",
+    "microsoft-entra-sso.error.invalid_email_linking": "Der konfigurierte E-Mail-Verknuepfungsmodus [:mode] ist ungueltig. Verwenden Sie always, same_tenant_only oder never.",
+    "microsoft-entra-sso.error.id_token_missing": "Die Token-Antwort enthielt kein ID-Token."
 }

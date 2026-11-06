@@ -33,7 +33,13 @@ class RedirectToMicrosoftController extends Controller
             $request->session()->put('microsoft_entra_sso_guard', $guard);
             $request->session()->put('microsoft_entra_sso_issued_at', time());
 
-            $url = $this->oauthService->getAuthorizationUrl($state, $codeVerifier);
+            $nonce = null;
+            if (! (bool) config('microsoft-entra-sso.stateless', false)) {
+                $nonce = MicrosoftOAuthService::generateState();
+                $request->session()->put('microsoft_entra_sso_nonce', $nonce);
+            }
+
+            $url = $this->oauthService->getAuthorizationUrl($state, $codeVerifier, $nonce);
 
             return redirect()->away($url);
         } catch (SSOException $e) {

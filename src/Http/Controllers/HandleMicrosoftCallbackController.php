@@ -49,10 +49,16 @@ class HandleMicrosoftCallbackController extends Controller
                 throw TokenExchangeException::missingCodeVerifier();
             }
 
+            // Absent for flows started before the nonce existed; then the nonce check is skipped.
+            $nonce = (bool) config('microsoft-entra-sso.stateless', false)
+                ? null
+                : $request->session()->pull('microsoft_entra_sso_nonce');
+            $nonce = is_string($nonce) && $nonce !== '' ? $nonce : null;
+
             $this->oauthService->setRedirectUri($this->getCallbackUrl($guard));
 
             $tokens = $this->oauthService->exchangeCodeForTokens($code, $codeVerifier);
-            $microsoftUser = $this->oauthService->getUserFromToken($tokens->accessToken)->withToken($tokens);
+            $microsoftUser = $this->oauthService->getUserFromTokens($tokens, $nonce);
 
             $user = $this->resolveUser($microsoftUser, $guard);
 
@@ -64,6 +70,7 @@ class HandleMicrosoftCallbackController extends Controller
                 'microsoft_entra_sso_code_verifier',
                 'microsoft_entra_sso_guard',
                 'microsoft_entra_sso_issued_at',
+                'microsoft_entra_sso_nonce',
             ]);
 
             $guardsConfig = config('microsoft-entra-sso.guards', []);

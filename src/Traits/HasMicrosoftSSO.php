@@ -4,6 +4,7 @@ namespace CodebarAg\MicrosoftEntraSSO\Traits;
 
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
 use CodebarAg\MicrosoftEntraSSO\Models\MicrosoftSSOIdentity;
+use CodebarAg\MicrosoftEntraSSO\Services\EmailLinkingPolicy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Arr;
@@ -22,10 +23,26 @@ trait HasMicrosoftSSO
 
     public static function findByMicrosoftId(string $microsoftId): ?static
     {
-        // Eloquent models are always constructible without arguments.
-        $morphClass = (new static)->getMorphClass(); // @phpstan-ignore new.static
+        $morphClass = (new (static::class))->getMorphClass();
 
         $identity = MicrosoftSSOIdentity::byMicrosoftId($microsoftId)
+            ->where('authenticatable_type', $morphClass)
+            ->first();
+
+        $model = $identity?->authenticatable;
+
+        return $model instanceof static ? $model : null;
+    }
+
+    /**
+     * Find the user by the Entra tenant id (tid) and object id (oid) of the identity.
+     * Identities that were linked before tenant ids were stored are not matched.
+     */
+    public static function findByMicrosoftIdentity(string $tenantId, string $objectId): ?static
+    {
+        $morphClass = (new (static::class))->getMorphClass();
+
+        $identity = MicrosoftSSOIdentity::byMicrosoftIdentity($tenantId, $objectId)
             ->where('authenticatable_type', $morphClass)
             ->first();
 
@@ -47,6 +64,7 @@ trait HasMicrosoftSSO
         $existing = static::findByMicrosoftId($mid);
 
         if ($existing) {
+            app(EmailLinkingPolicy::class)->assertIdentityTenant($existing, $microsoftUser);
             $existing->updateMicrosoftTokens($microsoftUser);
 
             return $existing;
@@ -60,6 +78,7 @@ trait HasMicrosoftSSO
         $byEmail = static::where('email', $email)->first();
 
         if ($byEmail instanceof static) {
+            app(EmailLinkingPolicy::class)->assertCanLink($byEmail, $microsoftUser);
             $byEmail->linkMicrosoftAccount($microsoftUser);
 
             return $byEmail;
@@ -99,13 +118,20 @@ trait HasMicrosoftSSO
             $expiresAt = Carbon::now()->addSeconds((int) $expiresIn);
         }
 
-        $this->microsoftIdentity()->updateOrCreate([], [
+        $attributes = [
             'microsoft_id' => $mid,
             'token' => Arr::get($microsoftUser, 'token'),
             'refresh_token' => Arr::get($microsoftUser, 'refresh_token'),
             'token_expires_at' => $expiresAt,
             'linked_at' => Carbon::now(),
-        ]);
+        ];
+
+        if (MicrosoftSSOIdentity::supportsTenantColumn()) {
+            $tenantId = Arr::get($microsoftUser, 'tenant_id');
+            $attributes['entra_tenant_id'] = is_string($tenantId) && $tenantId !== '' ? strtolower($tenantId) : null;
+        }
+
+        $this->microsoftIdentity()->updateOrCreate([], $attributes);
 
         $this->unsetRelation('microsoftIdentity');
     }
@@ -132,6 +158,13 @@ trait HasMicrosoftSSO
             'refresh_token' => Arr::get($microsoftUser, 'refresh_token'),
             'token_expires_at' => $expiresAt,
         ]);
+
+        $tenantId = Arr::get($microsoftUser, 'tenant_id');
+        if (is_string($tenantId) && $tenantId !== ''
+            && $identity->entra_tenant_id === null
+            && MicrosoftSSOIdentity::supportsTenantColumn()) {
+            $data['entra_tenant_id'] = strtolower($tenantId);
+        }
 
         if ($data) {
             $identity->update($data);

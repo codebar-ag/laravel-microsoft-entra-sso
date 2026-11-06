@@ -11,7 +11,7 @@ Microsoft Entra ID (Azure AD) SSO authentication package for Laravel using OAuth
 
 ## Requirements
 
-- PHP 8.3, 8.4, or 8.5
+- PHP 8.5 or newer
 - Laravel 13
 - A Microsoft Entra app registration
 
@@ -86,6 +86,127 @@ OAuth and Graph calls can be tuned:
 
 Use these values to set environment-specific resiliency for slow networks or transient upstream failures.
 
+## Multi-tenant (customer directories)
+
+By default the package suits a single company directory. If your app lets people from *other* organisations sign in (SaaS, customer portals, ticketing), configure it as follows. Everything below is opt-in; with no new config, behaviour is unchanged.
+
+### Accept customer directories
+
+Set the tenant to `organizations` (work and school accounts of any directory; use `common` to also allow personal accounts):
+
+```dotenv
+MICROSOFT_ENTRA_SSO_TENANT_ID=organizations
+```
+
+The Entra app registration must be set to "Accounts in any organizational directory (multitenant)".
+
+Use only scopes that customers can consent to on their own:
+
+```php
+'scopes' => ['openid', 'profile', 'email', 'User.Read'],
+```
+
+The package default also requests `GroupMember.Read.All`. That scope needs admin consent in every customer tenant, so sign-ins of regular customer users fail. Leave it out unless you really need group membership.
+
+### Validated id token, `tid` and `oid`
+
+The `openid` scope makes Entra return an id token. The package validates it and fails closed (the sign-in is refused with an error):
+
+- RS256 signature against the Entra JWKS (found via the OpenID discovery document, cached, refreshed at most once per cooldown when a token uses an unknown key id)
+- `aud` equals your client id
+- `iss` equals `https://login.microsoftonline.com/{tid}/v2.0` for the token's own `tid`
+- `exp`, `nbf`, `iat` with 60 seconds leeway
+- `nonce`, bound to the session (not in `stateless` mode)
+- if `tenant_id` is a tenant GUID, the token's `tid` must equal it
+
+The result is available as `SSOUser::$tenantId` and `SSOUser::$objectId`, and as `tenant_id` and `object_id` in the array handed to `findOrCreateFromMicrosoft()`, `linkMicrosoftAccount()`, `updateMicrosoftTokens()` and the events. `tid` is stored on the identity in the new `entra_tenant_id` column (run `php artisan migrate`; the package keeps working without the column but then stores no tenant). Identities created before the upgrade get their tenant filled in on their next sign-in.
+
+```php
+'id_token' => [
+    'validate' => true,                 // set false to ignore id tokens entirely
+    'require' => true,                  // reject token responses without an id token (recommended)
+    'leeway_seconds' => 60,
+    'jwks_cache_ttl' => 86400,
+    'jwks_refresh_cooldown' => 60,
+    'cache_store' => null,              // null = default cache store
+],
+```
+
+`require` defaults to `false` (or `MICROSOFT_ENTRA_SSO_REQUIRE_ID_TOKEN`) so existing apps keep working; multi-tenant apps should switch it on. Signature checking uses [firebase/php-jwt](https://github.com/firebase/php-jwt) (maintained by Google's Firebase team, minimal, JWK support, enforces the key's algorithm so `none`/HS256 confusion is not possible).
+
+Look up a user by tenant and object id with `User::findByMicrosoftIdentity($tenantId, $objectId)`. `findByMicrosoftId()` keeps working.
+
+### Login gate
+
+A gate decides which tenants (or users) may sign in at all. It runs on every Microsoft sign-in after token validation and **before** any user is looked up, linked or registered:
+
+```php
+use CodebarAg\MicrosoftEntraSSO\Contracts\LoginGate;
+use CodebarAg\MicrosoftEntraSSO\Data\SSOUser;
+
+class AllowedTenantsGate implements LoginGate
+{
+    public function allows(SSOUser $user, string $guard): bool
+    {
+        return $user->tenantId !== null
+            && Workspace::where('entra_tenant_id', $user->tenantId)->exists();
+    }
+}
+```
+
+```php
+'login_gate' => App\Auth\AllowedTenantsGate::class,
+```
+
+The class is resolved from the container. When it returns `false` no user is created or linked, the visitor is redirected to the login page with the usual `microsoft_entra_sso_error` flash message (translatable key `microsoft-entra-sso.error.login_denied`), and `SSOLoginDenied` is dispatched (reason `login_gate`) so you can log it. A configured class that does not exist or does not implement `LoginGate` denies every sign-in.
+
+### Email linking and nOAuth
+
+The package links an existing local user to a Microsoft sign-in by email (`mail`, else `userPrincipalName`). In a multi-tenant app this is dangerous ("nOAuth"): the `mail` attribute is controlled by the administrator of the signing-in directory, who can set it to anyone's address (for example `ceo@customer-a.com` in their own tenant) and sign in as that user. Never trust the email of a foreign tenant to identify an account.
+
+```php
+'email_linking' => 'same_tenant_only', // 'always' (default) | 'same_tenant_only' | 'never'
+```
+
+| Mode | Existing user matched by email |
+| --- | --- |
+| `always` | Linked (historic behaviour, default). |
+| `same_tenant_only` | Linked only if that user already has a Microsoft identity whose stored `entra_tenant_id` equals the sign-in's `tid`. A user with no Microsoft identity, an identity without a stored tenant, or a sign-in without a validated `tid` is **not** linked. |
+| `never` | Never linked by email. |
+
+A refused link shows the user `microsoft-entra-sso.error.email_linking_tenant_mismatch` or `...email_linking_disabled` ("an account with this email address already exists, sign in with your existing method and link your Microsoft account from your profile") and dispatches `SSOLoginDenied`. Users who are already linked (found by tenant/object id), and new users when `auto_register` is on, are unaffected by the mode. If a known `microsoft_id` shows up with a different tenant than the stored one, the sign-in is refused (`tenant_mismatch`).
+
+Linking from the profile page (calling `$user->linkMicrosoftAccount($data)` yourself while the user is signed in) is never restricted by this setting.
+
+If your model overrides `findOrCreateFromMicrosoft()`, call the policy before linking an existing user found by email:
+
+```php
+use CodebarAg\MicrosoftEntraSSO\Services\EmailLinkingPolicy;
+
+public static function findOrCreateFromMicrosoft(array $microsoftUser): static
+{
+    // ...
+    if ($byEmail) {
+        app(EmailLinkingPolicy::class)->assertCanLink($byEmail, $microsoftUser); // throws LoginDeniedException
+        $byEmail->linkMicrosoftAccount($microsoftUser);
+    }
+    // ...
+}
+```
+
+`canLink()` returns a boolean instead of throwing, and `mode()` returns the configured mode. The package's own controller applies the policy as well, so overriding is only needed if you replace the lookup logic.
+
+### Recommended configuration
+
+```php
+'tenant_id' => 'organizations',
+'scopes' => ['openid', 'profile', 'email', 'User.Read'],
+'auto_register' => false,               // or true together with a strict login gate
+'login_gate' => App\Auth\AllowedTenantsGate::class,
+'email_linking' => 'same_tenant_only',  // or 'never' and let users link from their profile
+'id_token' => ['require' => true],
+```
+
 ## Routes and controllers
 
 The package registers two routes under the configured prefix (`sso/microsoft` by default):
@@ -113,6 +234,7 @@ Under the hood the provider offers:
 - `getAuthorizationUrl($state, $codeVerifier)`
 - `exchangeCodeForTokens($code, $codeVerifier)`
 - `getUserFromToken($token)`
+- `getUserFromTokens($tokens, $nonce)` (Graph profile plus validated `tid`/`oid` from the id token)
 - `refreshAccessToken($refreshToken)`
 
 ## Services and methods
@@ -163,6 +285,7 @@ Static helpers on `MicrosoftOAuthService`:
 ### Model trait API (`HasMicrosoftSSO`)
 
 - `findByMicrosoftId(string $microsoftId): ?static`
+- `findByMicrosoftIdentity(string $tenantId, string $objectId): ?static`
 - `findOrCreateFromMicrosoft(array $microsoftUser): static`
 - `linkMicrosoftAccount(array $microsoftUser): void`
 - `updateMicrosoftTokens(array $microsoftUser): void`
@@ -181,6 +304,10 @@ Static helpers on `MicrosoftOAuthService`:
 
 - `fromGraphPayload(array $graphPayload): SSOUser`
 - `withToken(SSOToken $token): SSOUser`
+- `withTenant(?string $tenantId, ?string $objectId): SSOUser`
+- `withoutTokens(): SSOUser`
+
+`SSOUser` exposes the Entra tenant id as `$tenantId` (`tid`) and the object id as `$objectId` (`oid`). Both come from the validated id token and are `null` when no id token was issued.
 - `toArray(): array`
 
 ## Blade usage
@@ -241,6 +368,8 @@ The package dispatches:
 - `CodebarAg\MicrosoftEntraSSO\Events\SSOUserAuthenticated`
 
 Both events are emitted during the callback flow after the package authenticates or registers a user.
+
+- `CodebarAg\MicrosoftEntraSSO\Events\SSOLoginDenied` (login gate or email linking policy refused a sign-in; carries `microsoftUser` without tokens, `guard` and `reason`: `login_gate`, `email_linking_never`, `email_linking_tenant_mismatch` or `tenant_mismatch`)
 
 You can listen to these events to add:
 

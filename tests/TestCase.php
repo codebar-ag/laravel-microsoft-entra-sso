@@ -3,6 +3,7 @@
 namespace CodebarAg\MicrosoftEntraSSO\Tests;
 
 use CodebarAg\MicrosoftEntraSSO\MicrosoftEntraSSOServiceProvider;
+use CodebarAg\MicrosoftEntraSSO\Models\MicrosoftSSOIdentity;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
@@ -40,6 +41,7 @@ abstract class TestCase extends BaseTestCase
             'retry_times' => 1,
             'retry_sleep_ms' => 1,
         ]);
+        $app['config']->set('microsoft-entra-sso.id_token.jwks_refresh_cooldown', 0);
         $app['config']->set('microsoft-entra-sso.group_membership_cache_ttl', 0);
         $app['config']->set('microsoft-entra-sso.guards.web.model', TestUser::class);
         $app['config']->set('microsoft-entra-sso.guards.web.redirect_after_login', '/dashboard');
@@ -80,5 +82,8 @@ abstract class TestCase extends BaseTestCase
             $table->timestamp('linked_at')->nullable();
             $table->timestamps();
         });
+
+        (require __DIR__.'/../database/migrations/2026_11_06_000000_add_entra_tenant_id_to_microsoft_sso_identities_table.php')->up();
+        MicrosoftSSOIdentity::forgetTenantColumnCheck();
     }
 }
