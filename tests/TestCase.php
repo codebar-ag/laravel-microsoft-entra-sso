@@ -10,6 +10,7 @@ use CodebarAg\MicrosoftEntraSSO\Flow\StartSignIn;
 use CodebarAg\MicrosoftEntraSSO\Tests\Support\FakeEntra;
 use CodebarAg\MicrosoftEntraSSO\Tests\Support\TestProvisioner;
 use Illuminate\Contracts\Config\Repository;
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Client\Factory as HttpFactory;
@@ -72,6 +73,14 @@ abstract class TestCase extends BaseTestCase
         ], $identity));
 
         return $user;
+    }
+
+    /**
+     * @param  array<string, mixed>  $options
+     */
+    protected function command(string $command, array $options = []): int
+    {
+        return $this->container()->make(Kernel::class)->call($command, $options);
     }
 
     protected function http(): HttpFactory
@@ -138,17 +147,6 @@ abstract class TestCase extends BaseTestCase
             $table->timestamps();
         });
 
-        Schema::create('microsoft_sso_identities', function (Blueprint $table) {
-            $table->id();
-            $table->morphs('authenticatable');
-            $table->string('microsoft_id')->unique();
-            $table->string('entra_tenant_id', 36)->nullable();
-            $table->text('token')->nullable();
-            $table->text('refresh_token')->nullable();
-            $table->timestamp('token_expires_at')->nullable();
-            $table->timestamp('linked_at')->nullable();
-            $table->timestamps();
-        });
-
+        self::assertSame(0, $this->command('migrate'));
     }
 }
