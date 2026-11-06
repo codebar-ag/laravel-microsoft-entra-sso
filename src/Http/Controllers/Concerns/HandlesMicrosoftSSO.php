@@ -2,12 +2,16 @@
 
 namespace CodebarAg\MicrosoftEntraSSO\Http\Controllers\Concerns;
 
+use CodebarAg\MicrosoftEntraSSO\Contracts\LoginGate;
 use CodebarAg\MicrosoftEntraSSO\Contracts\SSOAuthenticatable;
 use CodebarAg\MicrosoftEntraSSO\Data\SSOUser;
+use CodebarAg\MicrosoftEntraSSO\Events\SSOLoginDenied;
 use CodebarAg\MicrosoftEntraSSO\Events\SSOUserAuthenticated;
 use CodebarAg\MicrosoftEntraSSO\Events\SSOUserRegistered;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\InvalidStateException;
+use CodebarAg\MicrosoftEntraSSO\Exceptions\LoginDeniedException;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
+use CodebarAg\MicrosoftEntraSSO\Services\EmailLinkingPolicy;
 use CodebarAg\MicrosoftEntraSSO\Services\GuardConfigValidator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
@@ -75,6 +79,38 @@ trait HandlesMicrosoftSSO
 
     protected function resolveUser(SSOUser $microsoftUser, string $guard): SSOAuthenticatable
     {
+        try {
+            $this->assertLoginAllowed($microsoftUser, $guard);
+
+            return $this->findOrRegisterUser($microsoftUser, $guard);
+        } catch (LoginDeniedException $e) {
+            SSOLoginDenied::dispatch($microsoftUser->withoutTokens(), $guard, $e->reason);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Runs the configured login gate. Nothing is looked up, linked or created before it passes.
+     */
+    protected function assertLoginAllowed(SSOUser $microsoftUser, string $guard): void
+    {
+        $gateClass = config('microsoft-entra-sso.login_gate');
+        if ($gateClass === null || $gateClass === '') {
+            return;
+        }
+
+        if (! is_string($gateClass) || ! class_exists($gateClass) || ! is_subclass_of($gateClass, LoginGate::class)) {
+            throw SSOException::invalidLoginGate(is_string($gateClass) ? $gateClass : get_debug_type($gateClass));
+        }
+
+        if (! app($gateClass)->allows($microsoftUser, $guard)) {
+            throw LoginDeniedException::byGate();
+        }
+    }
+
+    protected function findOrRegisterUser(SSOUser $microsoftUser, string $guard): SSOAuthenticatable
+    {
         $guardConfig = app(GuardConfigValidator::class)->guardConfig($guard);
         $modelClass = Arr::get($guardConfig, 'model');
         if (! is_string($modelClass) || $modelClass === '') {
@@ -91,6 +127,7 @@ trait HandlesMicrosoftSSO
         $existing = $modelClass::findByMicrosoftId($microsoftId);
 
         if ($existing) {
+            app(EmailLinkingPolicy::class)->assertIdentityTenant($existing, $microsoftUserData);
             $existing->updateMicrosoftTokens($microsoftUserData);
             SSOUserAuthenticated::dispatch($existing, $guard, $microsoftUserData);
 
@@ -104,6 +141,7 @@ trait HandlesMicrosoftSSO
         }
 
         if ($byEmail instanceof SSOAuthenticatable) {
+            app(EmailLinkingPolicy::class)->assertCanLink($byEmail, $microsoftUserData);
             $byEmail->linkMicrosoftAccount($microsoftUserData);
             SSOUserAuthenticated::dispatch($byEmail, $guard, $microsoftUserData);
 

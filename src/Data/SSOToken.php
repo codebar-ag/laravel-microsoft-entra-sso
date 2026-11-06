@@ -15,6 +15,7 @@ class SSOToken
         public readonly ?string $refreshToken,
         public readonly ?int $expiresIn,
         public readonly array $approvedScopes = [],
+        public readonly ?string $idToken = null,
     ) {}
 
     /**
@@ -42,12 +43,14 @@ class SSOToken
 
         $refreshToken = Arr::get($payload, 'refresh_token');
         $expiresIn = Arr::get($payload, 'expires_in');
+        $idToken = Arr::get($payload, 'id_token');
 
         return new self(
             accessToken: $accessToken,
             refreshToken: is_string($refreshToken) ? $refreshToken : null,
             expiresIn: is_int($expiresIn) ? $expiresIn : null,
             approvedScopes: $approvedScopes,
+            idToken: is_string($idToken) && $idToken !== '' ? $idToken : null,
         );
     }
 
@@ -61,6 +64,7 @@ class SSOToken
             'refresh_token' => $this->refreshToken,
             'expires_in' => $this->expiresIn,
             'scope' => implode(' ', $this->approvedScopes),
+            'id_token' => $this->idToken,
         ];
     }
 }

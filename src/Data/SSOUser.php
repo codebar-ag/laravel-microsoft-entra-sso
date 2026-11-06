@@ -22,6 +22,8 @@ class SSOUser
         public readonly ?string $refreshToken = null,
         public readonly ?int $expiresIn = null,
         public readonly array $approvedScopes = [],
+        public readonly ?string $tenantId = null,
+        public readonly ?string $objectId = null,
     ) {}
 
     /**
@@ -73,6 +75,47 @@ class SSOUser
             refreshToken: $token->refreshToken,
             expiresIn: $token->expiresIn,
             approvedScopes: $token->approvedScopes,
+            tenantId: $this->tenantId,
+            objectId: $this->objectId,
+        );
+    }
+
+    /**
+     * Attach the tenant (tid) and object id (oid) taken from a validated id token.
+     */
+    public function withTenant(?string $tenantId, ?string $objectId): self
+    {
+        return new self(
+            id: $this->id,
+            name: $this->name,
+            email: $this->email,
+            jobTitle: $this->jobTitle,
+            department: $this->department,
+            raw: $this->raw,
+            token: $this->token,
+            refreshToken: $this->refreshToken,
+            expiresIn: $this->expiresIn,
+            approvedScopes: $this->approvedScopes,
+            tenantId: $tenantId,
+            objectId: $objectId,
+        );
+    }
+
+    /**
+     * A copy without access/refresh tokens, safe to hand to events and logs.
+     */
+    public function withoutTokens(): self
+    {
+        return new self(
+            id: $this->id,
+            name: $this->name,
+            email: $this->email,
+            jobTitle: $this->jobTitle,
+            department: $this->department,
+            raw: $this->raw,
+            approvedScopes: $this->approvedScopes,
+            tenantId: $this->tenantId,
+            objectId: $this->objectId,
         );
     }
 
@@ -92,6 +135,8 @@ class SSOUser
             'refresh_token' => $this->refreshToken,
             'expires_in' => $this->expiresIn,
             'approved_scopes' => $this->approvedScopes,
+            'tenant_id' => $this->tenantId,
+            'object_id' => $this->objectId,
         ];
     }
 }

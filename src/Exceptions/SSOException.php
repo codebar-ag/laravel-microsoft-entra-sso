@@ -71,4 +71,14 @@ class SSOException extends Exception
     {
         return new self(__('microsoft-entra-sso.error.invalid_redirect_uri', ['uri' => $uri]));
     }
+
+    public static function invalidLoginGate(string $class): self
+    {
+        return new self(__('microsoft-entra-sso.error.invalid_login_gate', ['class' => $class]));
+    }
+
+    public static function invalidEmailLinking(string $mode): self
+    {
+        return new self(__('microsoft-entra-sso.error.invalid_email_linking', ['mode' => $mode]));
+    }
 }

@@ -306,3 +306,17 @@ it('throws on missing required configuration values', function () {
         scopes: ['openid'],
     );
 })->throws(SSOException::class);
+
+it('adds a nonce to the authorization url only when given', function () {
+    $service = new MicrosoftOAuthService(
+        tenantId: 'organizations',
+        clientId: 'my-client',
+        clientSecret: 'my-secret',
+        redirectUri: 'http://localhost/callback',
+        scopes: ['openid'],
+    );
+
+    expect($service->getAuthorizationUrl('s', 'v'))->not->toContain('nonce=')
+        ->and($service->getAuthorizationUrl('s', 'v', 'n-123'))->toContain('nonce=n-123')
+        ->and($service->getAuthorizationUrl('s', 'v'))->toContain('login.microsoftonline.com/organizations/');
+});

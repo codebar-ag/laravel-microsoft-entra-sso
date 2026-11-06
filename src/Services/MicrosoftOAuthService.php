@@ -62,7 +62,7 @@ class MicrosoftOAuthService implements Provider
         return rtrim(strtr(base64_encode(hash('sha256', $codeVerifier, true)), '+/', '-_'), '=');
     }
 
-    public function getAuthorizationUrl(string $state, string $codeVerifier): string
+    public function getAuthorizationUrl(string $state, string $codeVerifier, ?string $nonce = null): string
     {
         $this->validateConfiguration();
 
@@ -77,6 +77,10 @@ class MicrosoftOAuthService implements Provider
             'code_challenge_method' => 'S256',
             'prompt' => 'select_account',
         ];
+
+        if ($nonce !== null && $nonce !== '') {
+            $params['nonce'] = $nonce;
+        }
 
         return $this->authorizeEndpoint.'?'.http_build_query($params);
     }
@@ -146,6 +150,46 @@ class MicrosoftOAuthService implements Provider
         }
 
         return SSOUser::fromGraphPayload(self::jsonAsAssoc($data));
+    }
+
+    /**
+     * Load the Graph profile and, when an id token was issued, add the validated
+     * tenant (tid) and object id (oid) to it. Validation fails closed.
+     *
+     * Behaviour is controlled by `microsoft-entra-sso.id_token.validate` (default on)
+     * and `microsoft-entra-sso.id_token.require` (default off, reject responses
+     * without an id token).
+     */
+    public function getUserFromTokens(SSOToken $tokens, ?string $nonce = null): SSOUser
+    {
+        $user = $this->getUserFromToken($tokens->accessToken)->withToken($tokens);
+
+        if (config('microsoft-entra-sso.id_token.validate', true) === false) {
+            return $user;
+        }
+
+        if ($tokens->idToken === null) {
+            if (config('microsoft-entra-sso.id_token.require', false) === true) {
+                throw TokenExchangeException::failed('invalid_id_token', __('microsoft-entra-sso.error.id_token_missing'));
+            }
+
+            return $user;
+        }
+
+        $claims = $this->idTokenValidator()->validate($tokens->idToken, $nonce);
+
+        if ($claims->objectId !== null
+            && $claims->tenantId !== IdTokenValidator::MSA_TENANT_ID
+            && $claims->objectId !== $user->id) {
+            throw TokenExchangeException::failed('invalid_id_token', 'The id token does not belong to the Microsoft Graph user.');
+        }
+
+        return $user->withTenant($claims->tenantId, $claims->objectId);
+    }
+
+    protected function idTokenValidator(): IdTokenValidator
+    {
+        return new IdTokenValidator($this->tenantId, $this->clientId);
     }
 
     public function refreshAccessToken(string $refreshToken): SSOToken
