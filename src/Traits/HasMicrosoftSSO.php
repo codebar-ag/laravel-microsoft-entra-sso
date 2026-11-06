@@ -23,7 +23,7 @@ trait HasMicrosoftSSO
 
     public static function findByMicrosoftId(string $microsoftId): ?static
     {
-        $morphClass = static::make()->getMorphClass();
+        $morphClass = (new (static::class))->getMorphClass();
 
         $identity = MicrosoftSSOIdentity::byMicrosoftId($microsoftId)
             ->where('authenticatable_type', $morphClass)
@@ -40,7 +40,7 @@ trait HasMicrosoftSSO
      */
     public static function findByMicrosoftIdentity(string $tenantId, string $objectId): ?static
     {
-        $morphClass = static::make()->getMorphClass();
+        $morphClass = (new (static::class))->getMorphClass();
 
         $identity = MicrosoftSSOIdentity::byMicrosoftIdentity($tenantId, $objectId)
             ->where('authenticatable_type', $morphClass)
