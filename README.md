@@ -2,416 +2,212 @@
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/codebar-ag/laravel-microsoft-entra-sso.svg?style=flat-square)](https://packagist.org/packages/codebar-ag/laravel-microsoft-entra-sso)
 [![Total Downloads](https://img.shields.io/packagist/dt/codebar-ag/laravel-microsoft-entra-sso.svg?style=flat-square)](https://packagist.org/packages/codebar-ag/laravel-microsoft-entra-sso)
-[![GitHub-Tests](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/tests.yml)
+[![GitHub-Tests](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/run-tests.yml/badge.svg?branch=main)](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/run-tests.yml)
 [![GitHub Code Style](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/fix-php-code-style-issues.yml/badge.svg?branch=main)](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/fix-php-code-style-issues.yml)
 [![PHPStan](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/phpstan.yml/badge.svg)](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/phpstan.yml)
 [![Dependency Review](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/dependency-review.yml/badge.svg)](https://github.com/codebar-ag/laravel-microsoft-entra-sso/actions/workflows/dependency-review.yml)
 
-Microsoft Entra ID (Azure AD) SSO authentication package for Laravel using OAuth2 + OpenID Connect.
+Microsoft Entra ID SSO for Laravel (OAuth2 authorization code flow with PKCE + OpenID Connect). Strict, typed and small: you decide
+**who may enter** and **how a new user is created**, the package does the rest.
 
 ## Requirements
 
-- PHP 8.5 or newer
-- Laravel 13
-- A Microsoft Entra app registration
+- PHP 8.5, Laravel 13
+- A Microsoft Entra app registration (redirect URI `https://your-app.test/sso/microsoft/web/callback`)
 
 ## Installation
 
 ```bash
 composer require codebar-ag/laravel-microsoft-entra-sso
-```
-
-Publish config (optional, recommended):
-
-```bash
 php artisan vendor:publish --tag=microsoft-entra-sso-config
+php artisan migrate
 ```
 
-Publish package translations (recommended if you want to customize text or add locales):
+The package ships **no UI**. It redirects failed sign-ins to your login page with a translated message; you render the button and the
+message (see [Errors and the login page](#errors-and-the-login-page)).
 
-```bash
-php artisan vendor:publish --tag=microsoft-entra-sso-translations
-```
+Upgrading from v13? Read [UPGRADE.md](UPGRADE.md).
 
 ## Configuration
 
-Set these environment variables:
-
 ```dotenv
-MICROSOFT_ENTRA_SSO_TENANT_ID=your-tenant-id
-MICROSOFT_ENTRA_SSO_CLIENT_ID=your-client-id
-MICROSOFT_ENTRA_SSO_CLIENT_SECRET=your-client-secret
-MICROSOFT_ENTRA_SSO_REDIRECT_URI=${APP_URL}/sso/microsoft/web/callback
+MICROSOFT_ENTRA_SSO_TENANT_ID=00000000-0000-0000-0000-000000000000
+MICROSOFT_ENTRA_SSO_CLIENT_ID=...
+MICROSOFT_ENTRA_SSO_CLIENT_SECRET=...
 ```
 
-Configure guards in `config/microsoft-entra-sso.php`:
+The configuration is validated once, when it is first needed. An invalid value throws a `ConfigurationException` that names the key,
+nothing is silently replaced by a default.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `tenant_id` | none | A directory GUID (single directory) or `organizations`, `common`, `consumers` (customer directories) |
+| `client_id`, `client_secret` | none | The app registration |
+| `scopes` | `openid profile email User.Read` | Must contain `openid`. `GroupMember.Read.All` needs admin consent in every customer directory |
+| `auto_register` | `false` | Create unknown people through your `UserProvisioner` |
+| `user_provisioner` | `null` | `UserProvisioner` class, required when `auto_register` is on |
+| `login_gate` | `null` | `LoginGate` class that decides who may enter |
+| `email_linking` | `never` | `never`, `same_tenant_only`, `always` (single directory only), see [Email linking](#email-linking-and-noauth) |
+| `state_ttl_seconds` | `300` | How long the sign-in state stays valid in the session |
+| `allowed_redirect_hosts` | `[]` | Hosts the derived redirect URI may have (empty allows any; set it in production) |
+| `error_flash_key` | `microsoft_entra_sso_error` | Session flash key for the translated error |
+| `login_route` | `login` | Route name of your login page (`/` when the route does not exist) |
+| `route_prefix`, `route_middleware` | `sso/microsoft`, `['web']` | Route registration |
+| `id_token.*` | see file | Leeway, JWKS cache TTL and refresh cooldown, cache store |
+| `http.*` | see file | Timeouts and retries (only transient failures are retried) |
+| `graph.*` | see file | Group membership cache TTL, refresh lock |
+| `guards` | `web => [model, redirect_after_login]` | Guards that may sign in with Microsoft |
+
+Routes: `GET {prefix}/{guard}/redirect` (name `microsoft-entra-sso.redirect`) and `GET {prefix}/{guard}/callback`
+(`microsoft-entra-sso.callback`). The redirect URI registered in Entra is the callback URL of your app.
+
+### Single directory or customer directories
+
+- **Single directory** (`tenant_id` is a GUID): only people of that directory can sign in; other directories are refused by the id token
+  check. Use this for internal tools.
+- **Customer directories** (`organizations` or `common`): people of any directory can sign in. Always restrict them with a
+  [login gate](#login-gate) (for example a list of customer tenant ids) and keep `email_linking` at `never` or `same_tenant_only`.
+
+The identity of a person is the pair **tenant id (`tid`) and object id (`oid`)** of the validated id token (`EntraIdentity`), not the
+email address.
+
+## The user model
 
 ```php
-'guards' => [
-    'web' => [
-        'model' => App\Models\User::class,
-        'redirect_after_login' => '/dashboard',
-    ],
-],
+use CodebarAg\MicrosoftEntraSSO\Concerns\HasMicrosoftIdentity;
+use CodebarAg\MicrosoftEntraSSO\Contracts\SsoUser;
+
+class User extends Authenticatable implements SsoUser
+{
+    use HasMicrosoftIdentity; // microsoftIdentity() relation, isMicrosoftLinked(), isMicrosoftTokenExpired(), unlinkMicrosoft()
+}
 ```
 
-The configured model must implement `CodebarAg\MicrosoftEntraSSO\Contracts\SSOAuthenticatable` (typically via the `HasMicrosoftSSO` trait).
+The trait contains no sign-in logic. The identity (object id, tenant id, encrypted tokens) lives in the `microsoft_sso_identities` table
+(`MicrosoftIdentity` model).
 
-### Security and flow options
+## Login gate
 
-The package supports additional hardening options:
+The gate runs after the id token is validated and **before** anything is looked up, linked or created. A denial never touches your users.
 
 ```php
-'stateless' => false,
-'state_ttl_seconds' => 300,
-'allowed_redirect_hosts' => ['example.com', 'localhost'],
-```
-
-- `stateless`: skips session-bound state validation (useful for API/mobile callback workflows).
-- `state_ttl_seconds`: rejects stale OAuth state values.
-- `allowed_redirect_hosts`: prevents redirect URI host misuse.
-
-### HTTP behavior
-
-OAuth and Graph calls can be tuned:
-
-```php
-'http' => [
-    'timeout' => 10,
-    'connect_timeout' => 5,
-    'retry_times' => 1,
-    'retry_sleep_ms' => 200,
-],
-```
-
-Use these values to set environment-specific resiliency for slow networks or transient upstream failures.
-
-## Multi-tenant (customer directories)
-
-By default the package suits a single company directory. If your app lets people from *other* organisations sign in (SaaS, customer portals, ticketing), configure it as follows. Everything below is opt-in; with no new config, behaviour is unchanged.
-
-### Accept customer directories
-
-Set the tenant to `organizations` (work and school accounts of any directory; use `common` to also allow personal accounts):
-
-```dotenv
-MICROSOFT_ENTRA_SSO_TENANT_ID=organizations
-```
-
-The Entra app registration must be set to "Accounts in any organizational directory (multitenant)".
-
-Use only scopes that customers can consent to on their own:
-
-```php
-'scopes' => ['openid', 'profile', 'email', 'User.Read'],
-```
-
-The package default also requests `GroupMember.Read.All`. That scope needs admin consent in every customer tenant, so sign-ins of regular customer users fail. Leave it out unless you really need group membership.
-
-### Validated id token, `tid` and `oid`
-
-The `openid` scope makes Entra return an id token. The package validates it and fails closed (the sign-in is refused with an error):
-
-- RS256 signature against the Entra JWKS (found via the OpenID discovery document, cached, refreshed at most once per cooldown when a token uses an unknown key id)
-- `aud` equals your client id
-- `iss` equals `https://login.microsoftonline.com/{tid}/v2.0` for the token's own `tid`
-- `exp`, `nbf`, `iat` with 60 seconds leeway
-- `nonce`, bound to the session (not in `stateless` mode)
-- if `tenant_id` is a tenant GUID, the token's `tid` must equal it
-
-The result is available as `SSOUser::$tenantId` and `SSOUser::$objectId`, and as `tenant_id` and `object_id` in the array handed to `findOrCreateFromMicrosoft()`, `linkMicrosoftAccount()`, `updateMicrosoftTokens()` and the events. `tid` is stored on the identity in the new `entra_tenant_id` column (run `php artisan migrate`; the package keeps working without the column but then stores no tenant). Identities created before the upgrade get their tenant filled in on their next sign-in.
-
-```php
-'id_token' => [
-    'validate' => true,                 // set false to ignore id tokens entirely
-    'require' => true,                  // reject token responses without an id token (recommended)
-    'leeway_seconds' => 60,
-    'jwks_cache_ttl' => 86400,
-    'jwks_refresh_cooldown' => 60,
-    'cache_store' => null,              // null = default cache store
-],
-```
-
-`require` defaults to `false` (or `MICROSOFT_ENTRA_SSO_REQUIRE_ID_TOKEN`) so existing apps keep working; multi-tenant apps should switch it on. Signature checking uses [firebase/php-jwt](https://github.com/firebase/php-jwt) (maintained by Google's Firebase team, minimal, JWK support, enforces the key's algorithm so `none`/HS256 confusion is not possible).
-
-Look up a user by tenant and object id with `User::findByMicrosoftIdentity($tenantId, $objectId)`. `findByMicrosoftId()` keeps working.
-
-### Login gate
-
-A gate decides which tenants (or users) may sign in at all. It runs on every Microsoft sign-in after token validation and **before** any user is looked up, linked or registered:
-
-```php
+use CodebarAg\MicrosoftEntraSSO\Config\GuardConfig;
 use CodebarAg\MicrosoftEntraSSO\Contracts\LoginGate;
-use CodebarAg\MicrosoftEntraSSO\Data\SSOUser;
+use CodebarAg\MicrosoftEntraSSO\Identity\SignIn;
 
-class AllowedTenantsGate implements LoginGate
+final class CustomerTenantGate implements LoginGate
 {
-    public function allows(SSOUser $user, string $guard): bool
+    public function allows(SignIn $signIn, GuardConfig $guard): bool
     {
-        return $user->tenantId !== null
-            && Workspace::where('entra_tenant_id', $user->tenantId)->exists();
+        return Customer::query()->where('entra_tenant_id', $signIn->identity->tenantId)->where('active', true)->exists();
     }
 }
 ```
 
-```php
-'login_gate' => App\Auth\AllowedTenantsGate::class,
-```
+Register it: `'login_gate' => CustomerTenantGate::class`. `SignIn` carries `identity` (`EntraIdentity`), `profile` (`Profile`) and `tokens` (`Tokens`).
 
-The class is resolved from the container. When it returns `false` no user is created or linked, the visitor is redirected to the login page with the usual `microsoft_entra_sso_error` flash message (translatable key `microsoft-entra-sso.error.login_denied`), and `SSOLoginDenied` is dispatched (reason `login_gate`) so you can log it. A configured class that does not exist or does not implement `LoginGate` denies every sign-in.
+## User provisioner
 
-### Email linking and nOAuth
-
-The package links an existing local user to a Microsoft sign-in by email (`mail`, else `userPrincipalName`). In a multi-tenant app this is dangerous ("nOAuth"): the `mail` attribute is controlled by the administrator of the signing-in directory, who can set it to anyone's address (for example `ceo@customer-a.com` in their own tenant) and sign in as that user. Never trust the email of a foreign tenant to identify an account.
+Only used when `auto_register` is on and nobody matched. Create the user and return it; the package stores the Microsoft identity,
+dispatches `UserRegistered`, logs the user in and fires `SignedIn`.
 
 ```php
-'email_linking' => 'same_tenant_only', // 'always' (default) | 'same_tenant_only' | 'never'
-```
+use CodebarAg\MicrosoftEntraSSO\Contracts\SsoUser;
+use CodebarAg\MicrosoftEntraSSO\Contracts\UserProvisioner;
 
-| Mode | Existing user matched by email |
-| --- | --- |
-| `always` | Linked (historic behaviour, default). |
-| `same_tenant_only` | Linked only if that user already has a Microsoft identity whose stored `entra_tenant_id` equals the sign-in's `tid`. A user with no Microsoft identity, an identity without a stored tenant, or a sign-in without a validated `tid` is **not** linked. |
-| `never` | Never linked by email. |
-
-A refused link shows the user `microsoft-entra-sso.error.email_linking_tenant_mismatch` or `...email_linking_disabled` ("an account with this email address already exists, sign in with your existing method and link your Microsoft account from your profile") and dispatches `SSOLoginDenied`. Users who are already linked (found by tenant/object id), and new users when `auto_register` is on, are unaffected by the mode. If a known `microsoft_id` shows up with a different tenant than the stored one, the sign-in is refused (`tenant_mismatch`).
-
-Linking from the profile page (calling `$user->linkMicrosoftAccount($data)` yourself while the user is signed in) is never restricted by this setting.
-
-If your model overrides `findOrCreateFromMicrosoft()`, call the policy before linking an existing user found by email:
-
-```php
-use CodebarAg\MicrosoftEntraSSO\Services\EmailLinkingPolicy;
-
-public static function findOrCreateFromMicrosoft(array $microsoftUser): static
+final class MicrosoftUserProvisioner implements UserProvisioner
 {
-    // ...
-    if ($byEmail) {
-        app(EmailLinkingPolicy::class)->assertCanLink($byEmail, $microsoftUser); // throws LoginDeniedException
-        $byEmail->linkMicrosoftAccount($microsoftUser);
+    public function create(SignIn $signIn): SsoUser
+    {
+        return User::create([
+            'name' => $signIn->profile->name,
+            'email' => $signIn->profile->email,
+            'password' => Hash::make(Str::random(40)),
+            'email_verified_at' => now(),
+        ]);
     }
-    // ...
 }
 ```
 
-`canLink()` returns a boolean instead of throwing, and `mode()` returns the configured mode. The package's own controller applies the policy as well, so overriding is only needed if you replace the lookup logic.
+The returned user must be an instance of the model configured for the guard.
 
-### Recommended configuration
+## Email linking and nOAuth
 
-```php
-'tenant_id' => 'organizations',
-'scopes' => ['openid', 'profile', 'email', 'User.Read'],
-'auto_register' => false,               // or true together with a strict login gate
-'login_gate' => App\Auth\AllowedTenantsGate::class,
-'email_linking' => 'same_tenant_only',  // or 'never' and let users link from their profile
-'id_token' => ['require' => true],
+When nobody has the signing-in identity, an existing local user with the same email can be linked (`email_linking`):
+
+- `never` (default): never link. The person must sign in the old way and link from a profile page.
+- `same_tenant_only`: link only if that user's stored Microsoft identity belongs to the same tenant.
+- `always`: link by email. **Only allowed when `tenant_id` is a single directory GUID.**
+
+Why: the `email`/`mail` value of a Microsoft account in a foreign directory is **not proof of ownership**. An administrator of another
+directory can set any email on their own user ("nOAuth"). If a multi-directory app links by email, that administrator signs in as your
+user. With a single trusted directory the email is controlled by you, so `always` is safe there. `organizations`/`common`/`consumers`
+combined with `always` is a `ConfigurationException`.
+
+A known identity (same object id) arriving from a different tenant is always refused (`DenialReason::TenantMismatch`). Rows linked by
+v13 have no stored tenant; they are adopted and the tenant is stored on the first v14 sign-in.
+
+## Errors and the login page
+
+Failures implement `SignInFailure` and carry a translation key. The callback controller redirects to `login_route` and flashes the
+translated message under `error_flash_key`:
+
+```blade
+@if (session('microsoft_entra_sso_error'))
+    <p role="alert">{{ session('microsoft_entra_sso_error') }}</p>
+@endif
+
+<a href="{{ route('microsoft-entra-sso.redirect', ['guard' => 'web']) }}">Sign in with Microsoft</a>
 ```
 
-## Routes and controllers
+Publish the translations with `php artisan vendor:publish --tag=microsoft-entra-sso-translations` (English and German included).
+Exceptions that are not sign-in failures (`ConfigurationException`, bugs) are not swallowed.
 
-The package registers two routes under the configured prefix (`sso/microsoft` by default):
-
-- `GET /sso/microsoft/{guard}/redirect` -> `RedirectToMicrosoftController` (invokable)
-- `GET /sso/microsoft/{guard}/callback` -> `HandleMicrosoftCallbackController` (invokable)
-
-Named routes remain:
-
-- `microsoft-entra-sso.redirect`
-- `microsoft-entra-sso.callback`
-
-## Socialite-like API usage
-
-The facade resolves a manager/factory contract and supports driver resolution similar to Socialite:
+## Microsoft Graph
 
 ```php
 use CodebarAg\MicrosoftEntraSSO\Facades\MicrosoftEntraSSO;
 
-$provider = MicrosoftEntraSSO::driver('microsoft');
+$profile = MicrosoftEntraSSO::profile($user);          // GraphProfile (typed)
+$groups = MicrosoftEntraSSO::groups($user);            // list<Group>
+$photo = MicrosoftEntraSSO::photo($user);              // data URI or null
+$member = MicrosoftEntraSSO::isMemberOf($user, $guid); // cached per user model, user and group (graph.group_membership_cache_ttl)
 ```
 
-Under the hood the provider offers:
+(or inject `GraphProfileService`). The stored access token is used; when it expired it is refreshed with the stored refresh token under a
+cache lock (the default cache store must support locks), because refresh tokens are single use. Pagination links outside of
+`graph.microsoft.com` are refused. Failures throw `GraphException` or `TokenException`.
 
-- `getAuthorizationUrl($state, $codeVerifier)`
-- `exchangeCodeForTokens($code, $codeVerifier)`
-- `getUserFromToken($token)`
-- `getUserFromTokens($tokens, $nonce)` (Graph profile plus validated `tid`/`oid` from the id token)
-- `refreshAccessToken($refreshToken)`
+## Events
 
-## Services and methods
+| Event | Payload |
+| --- | --- |
+| `SignedIn` | `user`, `signIn`, `guard` (every successful sign-in) |
+| `UserRegistered` | `user`, `signIn`, `guard` (additionally, for new users) |
+| `SignInDenied` | `identity`, `profile`, `guard`, `reason` (`DenialReason`); carries no tokens |
 
-### Service resolution
+## What is validated
 
-Resolve the OAuth provider via facade/manager:
+PKCE (S256), `state` with TTL and guard binding (consumed on first use), `nonce`, the id token (RS256 only, signature against the Entra
+JWKS with a cache and a refresh cooldown, `aud`, `iss` vs. `tid`, `exp`/`nbf`/`iat` with leeway, configured directory), and that the
+`oid` equals the Graph user id (except personal Microsoft accounts). Authorization codes and refresh tokens are single use, so only
+transient failures (connection errors, 5xx) are retried.
 
-```php
-use CodebarAg\MicrosoftEntraSSO\Facades\MicrosoftEntraSSO;
+## Testing
 
-$provider = MicrosoftEntraSSO::driver('microsoft');
-```
-
-Resolve services directly from the container:
-
-```php
-use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftOAuthService;
-use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftGraphService;
-
-$oauth = app(MicrosoftOAuthService::class);
-$graph = app(MicrosoftGraphService::class);
-```
-
-### Provider API (OAuth)
-
-- `stateless(bool $stateless = true): static` - enable/disable session-less callback validation mode.
-- `getAuthorizationUrl(string $state, string $codeVerifier): string` - build Microsoft authorize URL.
-- `exchangeCodeForTokens(string $code, string $codeVerifier): SSOToken` - exchange callback code for tokens.
-- `getUserFromToken(string $accessToken): SSOUser` - fetch current Microsoft user profile from Graph `/me`.
-- `refreshAccessToken(string $refreshToken): SSOToken` - refresh an expired/expiring token.
-- `setRedirectUri(string $uri): static` - override redirect URI at runtime.
-- `getRedirectUri(): ?string` - inspect current redirect URI.
-
-Static helpers on `MicrosoftOAuthService`:
-
-- `generateState(): string` - generate random OAuth state.
-- `generateCodeVerifier(): string` - generate PKCE verifier.
-- `generateCodeChallenge(string $codeVerifier): string` - derive PKCE S256 challenge.
-
-### Graph API helper service
-
-- `getUserProfile(SSOAuthenticatable $user): array` - extended profile fields from Microsoft Graph.
-- `getUserGroups(SSOAuthenticatable $user): Collection` - all Azure AD groups for the user (handles pagination).
-- `getUserPhotoDataUri(SSOAuthenticatable $user): ?string` - profile photo as data URI (`null` when missing).
-- `isUserInGroup(SSOAuthenticatable $user, string $groupId): bool` - efficient membership check (cache-aware).
-
-### Model trait API (`HasMicrosoftSSO`)
-
-- `findByMicrosoftId(string $microsoftId): ?static`
-- `findByMicrosoftIdentity(string $tenantId, string $objectId): ?static`
-- `findOrCreateFromMicrosoft(array $microsoftUser): static`
-- `linkMicrosoftAccount(array $microsoftUser): void`
-- `updateMicrosoftTokens(array $microsoftUser): void`
-- `hasMicrosoftSSOLinked(): bool`
-- `isMicrosoftTokenExpired(): bool`
-- `unlinkMicrosoftAccount(): void`
-
-### Data objects
-
-`SSOToken` helpers:
-
-- `fromArray(array $payload): SSOToken`
-- `toArray(): array`
-
-`SSOUser` helpers:
-
-- `fromGraphPayload(array $graphPayload): SSOUser`
-- `withToken(SSOToken $token): SSOUser`
-- `withTenant(?string $tenantId, ?string $objectId): SSOUser`
-- `withoutTokens(): SSOUser`
-
-`SSOUser` exposes the Entra tenant id as `$tenantId` (`tid`) and the object id as `$objectId` (`oid`). Both come from the validated id token and are `null` when no id token was issued.
-- `toArray(): array`
-
-## Blade usage
-
-Use the bundled button component in your login view:
-
-```blade
-<x-microsoft-entra-sso::sso-button guard="web" />
-```
-
-You can override the label with a translation key:
-
-```blade
-<x-microsoft-entra-sso::sso-button
-    guard="web"
-    label="microsoft-entra-sso.button.sign_in"
-/>
-```
-
-## Translations
-
-The package ships with JSON translations for:
-
-- `lang/en.json`
-- `lang/de.json`
-
-After publishing (`microsoft-entra-sso-translations`), you can:
-
-- edit existing keys in your application's `lang/en.json` and `lang/de.json`
-- add additional locales by creating files like `lang/fr.json` with the same keys
-- set `APP_LOCALE` (and optionally `APP_FALLBACK_LOCALE`) to control runtime language
-
-## Tailwind v4 (plain Tailwind, no Flux)
-
-This package does not require Flux or any frontend UI dependency.
-
-If you use the provided Blade component styles, ensure Tailwind v4 scans the package classes. Add a source path in your app stylesheet:
-
-```css
-@import "tailwindcss";
-@source "../../packages/codebar-ag/laravel-microsoft-entra-sso/resources/views/**/*.blade.php";
-```
-
-If your package is installed from `vendor/`, point `@source` at the vendor path instead:
-
-```css
-@import "tailwindcss";
-@source "../../vendor/codebar-ag/laravel-microsoft-entra-sso/resources/views/**/*.blade.php";
-```
-
-Alternative: publish views and scan `resources/views/vendor/microsoft-entra-sso/**/*.blade.php`.
-
-## Events and extension points
-
-The package dispatches:
-
-- `CodebarAg\MicrosoftEntraSSO\Events\SSOUserRegistered`
-- `CodebarAg\MicrosoftEntraSSO\Events\SSOUserAuthenticated`
-
-Both events are emitted during the callback flow after the package authenticates or registers a user.
-
-- `CodebarAg\MicrosoftEntraSSO\Events\SSOLoginDenied` (login gate or email linking policy refused a sign-in; carries `microsoftUser` without tokens, `guard` and `reason`: `login_gate`, `email_linking_never`, `email_linking_tenant_mismatch` or `tenant_mismatch`)
-
-You can listen to these events to add:
-
-- custom provisioning
-- role/group synchronization
-- audit logging
-
-## Troubleshooting
-
-- `microsoft_entra_sso_error` in session:
-  - Check Entra app credentials and callback URL.
-  - Ensure guard exists in `config/microsoft-entra-sso.php`.
-  - Ensure your app has a `login` route (or fallback redirect handling in your app).
-  - If state errors occur, verify callback happens within `state_ttl_seconds`.
-- Button appears unstyled:
-  - Verify Tailwind v4 `@source` includes package Blade view paths.
-  - Rebuild frontend assets after changing Tailwind sources.
-
-## Quality Checks
-
-Run linting:
+Use `Http::fake()` for `login.microsoftonline.com` (token endpoint, OpenID discovery, JWKS) and `graph.microsoft.com`. The package's own
+tests contain a `FakeEntra` helper (`tests/Support/FakeEntra.php`) that generates RSA keys, signs id tokens and fakes all three
+surfaces; copy it into your test suite. To start a flow in a test, call `StartSignIn::handle($session, 'web')` and sign the id token
+with the returned `flow->nonce`, then call `CompleteSignIn::handle($session, 'web', new CallbackParameters($code, $flow->state))`.
 
 ```bash
-composer lint
+composer test            # Pest
+composer analyse         # PHPStan level max over src and tests
+composer lint            # Pint
+vendor/bin/pest --type-coverage --min=100
+vendor/bin/pest --coverage --min=95
 ```
 
-Run static analysis:
+## License
 
-```bash
-composer analyse
-```
-
-`composer analyse` runs PHPStan/Larastan using `phpstan.neon.dist` at level 9.
-
-Run package tests:
-
-```bash
-composer test
-```
-
-Run coverage with enforced minimum:
-
-```bash
-composer test-coverage
-```
+MIT. See [LICENSE.md](LICENSE.md).

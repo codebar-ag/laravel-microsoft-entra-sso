@@ -12,7 +12,7 @@ final class OtherUser extends Authenticatable implements SsoUser
 {
     use HasMicrosoftIdentity;
 
-    protected $table = 'users';
+    protected $table = 'other_users';
 
     protected $fillable = ['name', 'email', 'password'];
 }
