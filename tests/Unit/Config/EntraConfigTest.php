@@ -7,7 +7,7 @@ namespace CodebarAg\MicrosoftEntraSSO\Tests\Unit\Config;
 use CodebarAg\MicrosoftEntraSSO\Config\EntraConfig;
 use CodebarAg\MicrosoftEntraSSO\Enums\EmailLinkingMode;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\ConfigurationException;
-use CodebarAg\MicrosoftEntraSSO\Tests\Support\EntraFake;
+use CodebarAg\MicrosoftEntraSSO\Tests\Support\FakeEntra;
 use CodebarAg\MicrosoftEntraSSO\Tests\Support\TenantGate;
 use CodebarAg\MicrosoftEntraSSO\Tests\TestCase;
 use CodebarAg\MicrosoftEntraSSO\Tests\TestUser;
@@ -38,7 +38,7 @@ final class EntraConfigTest extends TestCase
     {
         $config = $this->build();
 
-        self::assertSame(EntraFake::TENANT, $config->tenant->value);
+        self::assertSame(FakeEntra::TENANT, $config->tenant->value);
         self::assertTrue($config->tenant->isSingleDirectory());
         self::assertSame('test-client-id', $config->clientId);
         self::assertSame(EmailLinkingMode::Always, $config->emailLinking);
@@ -70,6 +70,22 @@ final class EntraConfigTest extends TestCase
     }
 
     #[Test]
+    public function auto_register_requires_a_user_provisioner(): void
+    {
+        $this->expectExceptionMessage('user_provisioner');
+
+        $this->build(['user_provisioner' => null]);
+    }
+
+    #[Test]
+    public function without_auto_register_no_provisioner_is_needed(): void
+    {
+        $config = $this->build(['auto_register' => false, 'user_provisioner' => null]);
+
+        self::assertNull($config->userProvisioner);
+    }
+
+    #[Test]
     public function it_resolves_the_login_gate(): void
     {
         $config = $this->build(['login_gate' => TenantGate::class]);
@@ -96,6 +112,8 @@ final class EntraConfigTest extends TestCase
             'gate wrong type' => ['login_gate', stdClass::class],
             'gate not a string' => ['login_gate', 1],
             'ttl' => ['state_ttl_seconds', 0],
+            'provisioner wrong type' => ['user_provisioner', stdClass::class],
+            'provisioner missing class' => ['user_provisioner', 'App\\Nope'],
             'auto register' => ['auto_register', 'yes'],
             'timeout' => ['http.timeout', 0],
             'retry sleep' => ['http.retry_sleep_ms', -1],

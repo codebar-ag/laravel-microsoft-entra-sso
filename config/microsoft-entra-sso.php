@@ -60,6 +60,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | User Provisioner
+    |--------------------------------------------------------------------------
+    |
+    | Class implementing CodebarAg\MicrosoftEntraSSO\Contracts\UserProvisioner.
+    | It creates the local user when auto_register is on and nobody matched.
+    | Required when auto_register is true.
+    |
+    */
+
+    'user_provisioner' => null,
+
+    /*
+    |--------------------------------------------------------------------------
     | Id Token Validation
     |--------------------------------------------------------------------------
     |

@@ -4,53 +4,24 @@ declare(strict_types=1);
 
 namespace CodebarAg\MicrosoftEntraSSO\Http\Controllers;
 
-use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
-use CodebarAg\MicrosoftEntraSSO\Http\Controllers\Concerns\HandlesMicrosoftSSO;
-use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftOAuthService;
+use CodebarAg\MicrosoftEntraSSO\Config\EntraConfig;
+use CodebarAg\MicrosoftEntraSSO\Exceptions\InvalidRedirectUriException;
+use CodebarAg\MicrosoftEntraSSO\Flow\StartSignIn;
+use CodebarAg\MicrosoftEntraSSO\Http\LoginRedirector;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
-final class RedirectToMicrosoftController extends Controller
+final readonly class RedirectToMicrosoftController
 {
-    use HandlesMicrosoftSSO;
-
-    public function __construct(
-        protected MicrosoftOAuthService $oauthService,
-    ) {}
-
-    public function __invoke(Request $request, string $guard = 'web'): RedirectResponse
+    public function __invoke(Request $request, string $guard, EntraConfig $config, StartSignIn $start, LoginRedirector $redirector): RedirectResponse
     {
+        $config->findGuard($guard) ?? throw new NotFoundHttpException;
+
         try {
-            $this->validateGuard($guard);
-
-            $state = MicrosoftOAuthService::generateState();
-            $codeVerifier = MicrosoftOAuthService::generateCodeVerifier();
-
-            $this->oauthService->setRedirectUri($this->getCallbackUrl($guard));
-
-            $request->session()->put('microsoft_entra_sso_state', $state);
-            $request->session()->put('microsoft_entra_sso_code_verifier', $codeVerifier);
-            $request->session()->put('microsoft_entra_sso_guard', $guard);
-            $request->session()->put('microsoft_entra_sso_issued_at', time());
-
-            $nonce = null;
-            if (! (bool) config('microsoft-entra-sso.stateless', false)) {
-                $nonce = MicrosoftOAuthService::generateState();
-                $request->session()->put('microsoft_entra_sso_nonce', $nonce);
-            }
-
-            $url = $this->oauthService->getAuthorizationUrl($state, $codeVerifier, $nonce);
-
-            return redirect()->away($url);
-        } catch (SSOException $e) {
-            Log::warning('Microsoft Entra SSO redirect failed', [
-                'guard' => $guard,
-                'error' => $e->getMessage(),
-            ]);
-
-            return $this->redirectToLoginWithError($e->getMessage());
+            return redirect()->away($start->handle($request->session(), $guard)->url);
+        } catch (InvalidRedirectUriException $e) {
+            return $redirector->failed($e, $guard);
         }
     }
 }
