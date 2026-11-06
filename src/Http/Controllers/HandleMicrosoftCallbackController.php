@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Http\Controllers;
 
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
@@ -13,7 +15,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
-class HandleMicrosoftCallbackController extends Controller
+final class HandleMicrosoftCallbackController extends Controller
 {
     use HandlesMicrosoftSSO;
 

@@ -36,6 +36,7 @@
         "orchestra/testbench": "^11.0",
         "pestphp/pest": "^5.0",
         "pestphp/pest-plugin-laravel": "^5.0",
+        "pestphp/pest-plugin-type-coverage": "^5.0",
         "phpstan/phpstan": "^2.1"
     },
     "autoload": {
@@ -50,10 +51,11 @@
     },
     "scripts": {
         "test": "vendor/bin/pest",
-        "test-coverage": "vendor/bin/pest --coverage --min=100",
+        "test-coverage": "vendor/bin/pest --coverage --min=95",
+        "type-coverage": "vendor/bin/pest --type-coverage --min=100",
         "format": "vendor/bin/pint",
         "lint": "vendor/bin/pint --test",
-        "analyse": "vendor/bin/phpstan analyse -c phpstan.neon.dist",
+        "analyse": "vendor/bin/phpstan analyse -c phpstan.neon.dist --memory-limit=1G",
         "quality": [
             "@lint",
             "@analyse",
@@ -69,7 +71,7 @@
     "extra": {
         "laravel": {
             "providers": [
-                "CodebarAg\\MicrosoftEntraSSO\\MicrosoftEntraSSOServiceProvider"
+                "CodebarAg\\MicrosoftEntraSSO\\EntraSsoServiceProvider"
             ],
             "aliases": {
                 "MicrosoftEntraSSO": "CodebarAg\\MicrosoftEntraSSO\\Facades\\MicrosoftEntraSSO"

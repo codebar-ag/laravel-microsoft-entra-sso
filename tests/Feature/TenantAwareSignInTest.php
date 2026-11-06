@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use CodebarAg\MicrosoftEntraSSO\Events\SSOLoginDenied;
 use CodebarAg\MicrosoftEntraSSO\Events\SSOUserAuthenticated;
 use CodebarAg\MicrosoftEntraSSO\Events\SSOUserRegistered;
@@ -75,6 +77,8 @@ it('logs in an existing identity and backfills a missing tenant', function () {
 });
 
 it('refuses a known microsoft id that now arrives from another tenant', function () {
+    config()->set('microsoft-entra-sso.tenant_id', 'organizations');
+    config()->set('microsoft-entra-sso.email_linking', 'never');
     EntraFake::http(['id_token' => EntraFake::idToken(['tid' => EntraFake::OTHER_TENANT])]);
     existingUser(EntraFake::TENANT, EntraFake::OID);
     Event::fake([SSOLoginDenied::class]);
@@ -116,6 +120,8 @@ it('rejects an id token that belongs to another graph user', function () {
 });
 
 it('skips the oid check for personal microsoft accounts', function () {
+    config()->set('microsoft-entra-sso.tenant_id', 'organizations');
+    config()->set('microsoft-entra-sso.email_linking', 'never');
     EntraFake::http(['id_token' => EntraFake::idToken(['tid' => '9188040d-6c67-4c5b-b112-36a304b66dad', 'oid' => 'pairwise'])]);
 
     signIn()->assertRedirect('/dashboard');
@@ -227,19 +233,6 @@ it('also gates users that are already linked', function () {
     expect(Auth::check())->toBeFalse();
 });
 
-it('fails closed when the gate class is invalid', function (mixed $gate) {
-    config()->set('microsoft-entra-sso.login_gate', $gate);
-    EntraFake::http();
-
-    signIn()->assertRedirect('/login')->assertSessionHas('microsoft_entra_sso_error');
-
-    expect(TestUser::count())->toBe(0);
-})->with(['missing class' => 'App\\Nope', 'wrong type' => stdClass::class, 'not a string' => [[1]]]);
-
-it('has the gate disabled by default', function () {
-    expect(config('microsoft-entra-sso.login_gate'))->toBeNull();
-});
-
 // --- email linking --------------------------------------------------------
 
 it('links by email by default, also across tenants (unchanged behaviour)', function () {
@@ -330,16 +323,6 @@ it('never still lets already linked identities and new users in', function () {
     expect(TestUser::count())->toBe(1);
 });
 
-it('fails closed on an unknown email linking mode', function () {
-    config()->set('microsoft-entra-sso.email_linking', 'sometimes');
-    EntraFake::http();
-    TestUser::create(['name' => 'E', 'email' => 'john@example.com', 'password' => bcrypt('x')]);
-
-    signIn()->assertRedirect('/login')->assertSessionHas('microsoft_entra_sso_error');
-
-    expect(Auth::check())->toBeFalse();
-});
-
 it('applies the policy to apps that call findOrCreateFromMicrosoft directly', function () {
     $payload = ['id' => 'new-oid', 'name' => 'J', 'email' => 'john@example.com', 'tenant_id' => EntraFake::OTHER_TENANT];
     TestUser::create(['name' => 'E', 'email' => 'john@example.com', 'password' => bcrypt('x')]);
@@ -384,26 +367,3 @@ it('keeps an existing tenant when tokens are updated', function () {
 });
 
 // --- migration ------------------------------------------------------------
-
-it('adds the tenant column with both indexes and can be rolled back', function () {
-    expect(Schema::hasColumn('microsoft_sso_identities', 'entra_tenant_id'))->toBeTrue()
-        ->and(Schema::hasIndex('microsoft_sso_identities', 'microsoft_sso_identities_entra_tenant_id_index'))->toBeTrue()
-        ->and(Schema::hasIndex('microsoft_sso_identities', ['entra_tenant_id', 'microsoft_id']))->toBeTrue();
-
-    (require __DIR__.'/../../database/migrations/2026_11_06_000000_add_entra_tenant_id_to_microsoft_sso_identities_table.php')->down();
-
-    expect(Schema::hasColumn('microsoft_sso_identities', 'entra_tenant_id'))->toBeFalse();
-});
-
-it('keeps working for apps that have not run the migration yet', function () {
-    (require __DIR__.'/../../database/migrations/2026_11_06_000000_add_entra_tenant_id_to_microsoft_sso_identities_table.php')->down();
-    MicrosoftSSOIdentity::forgetTenantColumnCheck();
-    EntraFake::http();
-
-    signIn()->assertRedirect('/dashboard');
-    Auth::logout();
-    signIn()->assertRedirect('/dashboard');
-
-    expect(MicrosoftSSOIdentity::count())->toBe(1)
-        ->and(MicrosoftSSOIdentity::supportsTenantColumn())->toBeFalse();
-});

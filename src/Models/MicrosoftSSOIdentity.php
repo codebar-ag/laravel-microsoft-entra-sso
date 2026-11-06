@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Models;
 
 use Illuminate\Database\Eloquent\Builder;
@@ -16,7 +18,7 @@ use Illuminate\Support\Facades\Schema;
  * @property Carbon|null $token_expires_at
  * @property Carbon|null $linked_at
  */
-class MicrosoftSSOIdentity extends Model
+final class MicrosoftSSOIdentity extends Model
 {
     protected $table = 'microsoft_sso_identities';
 

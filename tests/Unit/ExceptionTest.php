@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use CodebarAg\MicrosoftEntraSSO\Exceptions\InvalidStateException;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\TokenExchangeException;

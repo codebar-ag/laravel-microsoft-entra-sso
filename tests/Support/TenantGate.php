@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Tests\Support;
 
 use CodebarAg\MicrosoftEntraSSO\Contracts\LoginGate;
@@ -8,7 +10,7 @@ use CodebarAg\MicrosoftEntraSSO\Data\SSOUser;
 /**
  * Only lets the allowed tenants in; remembers what it was asked.
  */
-class TenantGate implements LoginGate
+final class TenantGate implements LoginGate
 {
     /** @var array<int, array{SSOUser, string}> */
     public static array $calls = [];

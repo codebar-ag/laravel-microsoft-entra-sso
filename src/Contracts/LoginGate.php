@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Contracts;
 
 use CodebarAg\MicrosoftEntraSSO\Data\SSOUser;

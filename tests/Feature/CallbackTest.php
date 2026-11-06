@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use CodebarAg\MicrosoftEntraSSO\Events\SSOUserAuthenticated;
 use CodebarAg\MicrosoftEntraSSO\Events\SSOUserRegistered;
 use CodebarAg\MicrosoftEntraSSO\Tests\TestUser;

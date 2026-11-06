@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use CodebarAg\MicrosoftEntraSSO\Contracts\Provider;
 use CodebarAg\MicrosoftEntraSSO\Data\SSOToken;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
@@ -228,7 +230,7 @@ it('does not follow group pagination links outside of microsoft graph', function
     Http::assertNotSent(fn ($request) => str_contains($request->url(), 'attacker.example.com'));
 });
 
-class OtherModelTestUser extends TestUser {}
+final class OtherModelTestUser extends TestUser {}
 
 it('does not share cached group membership between different models with the same key', function () {
     config()->set('microsoft-entra-sso.group_membership_cache_ttl', 60);

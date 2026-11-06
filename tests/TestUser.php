@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Tests;
 
 use CodebarAg\MicrosoftEntraSSO\Contracts\SSOAuthenticatable;

@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Exceptions;
 
-class TokenExchangeException extends SSOException
+final class TokenExchangeException extends SSOException
 {
     public static function failed(string $error, string $description = ''): self
     {

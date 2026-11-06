@@ -1,11 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Traits;
 
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
 use CodebarAg\MicrosoftEntraSSO\Models\MicrosoftSSOIdentity;
 use CodebarAg\MicrosoftEntraSSO\Services\EmailLinkingPolicy;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
@@ -14,7 +15,7 @@ use Illuminate\Support\Str;
 trait HasMicrosoftSSO
 {
     /**
-     * @return MorphOne<MicrosoftSSOIdentity, Model>
+     * @return MorphOne<MicrosoftSSOIdentity, $this>
      */
     public function microsoftIdentity(): MorphOne
     {

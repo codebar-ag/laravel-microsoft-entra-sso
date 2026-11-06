@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Facades;
 
 use CodebarAg\MicrosoftEntraSSO\Contracts\Factory;
@@ -11,7 +13,7 @@ use Illuminate\Support\Facades\Facade;
  *
  * @see MicrosoftEntraSSOManager
  */
-class MicrosoftEntraSSO extends Facade
+final class MicrosoftEntraSSO extends Facade
 {
     protected static function getFacadeAccessor(): string
     {

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Tests\Support;
 
 use Firebase\JWT\JWT;
@@ -8,7 +10,7 @@ use Illuminate\Support\Facades\Http;
 /**
  * Locally generated RSA keys, signed id tokens and a faked Entra HTTP surface.
  */
-class EntraFake
+final class EntraFake
 {
     public const TENANT = '11111111-1111-4111-8111-111111111111';
 

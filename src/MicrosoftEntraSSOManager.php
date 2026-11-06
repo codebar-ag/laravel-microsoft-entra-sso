@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO;
 
 use CodebarAg\MicrosoftEntraSSO\Contracts\Factory;
 use CodebarAg\MicrosoftEntraSSO\Contracts\Provider;
 use InvalidArgumentException;
 
-class MicrosoftEntraSSOManager implements Factory
+final class MicrosoftEntraSSOManager implements Factory
 {
     public function __construct(
         protected Provider $provider,

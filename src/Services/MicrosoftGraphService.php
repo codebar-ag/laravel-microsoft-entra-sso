@@ -1,18 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Services;
 
 use CodebarAg\MicrosoftEntraSSO\Contracts\Provider;
 use CodebarAg\MicrosoftEntraSSO\Contracts\SSOAuthenticatable;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
 use CodebarAg\MicrosoftEntraSSO\Models\MicrosoftSSOIdentity;
+use CodebarAg\MicrosoftEntraSSO\Support\Payload;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
-class MicrosoftGraphService
+final class MicrosoftGraphService
 {
     protected const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 
@@ -38,7 +41,7 @@ class MicrosoftGraphService
      *     department: ?string,
      *     officeLocation: ?string,
      *     mobilePhone: ?string,
-     *     businessPhones: array<int, mixed>,
+     *     businessPhones: list<string>,
      *     city: ?string,
      *     state: ?string,
      *     country: ?string,
@@ -68,7 +71,7 @@ class MicrosoftGraphService
             throw SSOException::invalidGraphResponse('profile');
         }
 
-        return $this->normalizeUserProfile(self::jsonAsAssoc($data));
+        return $this->normalizeUserProfile(Payload::assoc($data));
     }
 
     /**
@@ -78,7 +81,7 @@ class MicrosoftGraphService
      */
     public function getUserGroups(SSOAuthenticatable $user): Collection
     {
-        $groups = collect();
+        $groups = [];
         $url = self::GRAPH_BASE.'/me/memberOf/microsoft.graph.group?$select=id,displayName,description';
 
         do {
@@ -90,11 +93,14 @@ class MicrosoftGraphService
                 throw SSOException::invalidGraphResponse('groups');
             }
             $value = Arr::get($data, 'value', []);
-            $chunk = collect(is_array($value) ? $value : [])
-                ->filter(fn ($item) => is_array($item))
-                ->values()
-                ->all();
-            $groups = $groups->concat($chunk);
+            $chunk = Payload::objects($value);
+            foreach ($chunk as $group) {
+                $groups[] = [
+                    'id' => is_string($group['id'] ?? null) ? $group['id'] : '',
+                    'displayName' => Payload::string($group['displayName'] ?? null),
+                    'description' => Payload::string($group['description'] ?? null),
+                ];
+            }
             $next = Arr::get($data, '@odata.nextLink');
             $url = is_string($next) && $next !== '' ? $next : null;
 
@@ -105,7 +111,7 @@ class MicrosoftGraphService
             }
         } while ($url);
 
-        return $groups;
+        return collect($groups);
     }
 
     /**
@@ -129,7 +135,7 @@ class MicrosoftGraphService
         }
 
         $contentType = $response->header('Content-Type');
-        if (! is_string($contentType) || $contentType === '') {
+        if ($contentType === '') {
             $contentType = 'image/jpeg';
         }
 
@@ -230,14 +236,11 @@ class MicrosoftGraphService
         $refreshedIdentity = Cache::lock($lockKey, $lockTtl)->block($waitSeconds, function () use ($user, $identity) {
             /** @var MicrosoftSSOIdentity|null $freshIdentity */
             $freshIdentity = $user->microsoftIdentity()->first();
-            if ($freshIdentity && ! $freshIdentity->isTokenExpired() && is_string($freshIdentity->token) && $freshIdentity->token !== '') {
+            if ($freshIdentity && ! $freshIdentity->isTokenExpired() && $freshIdentity->token !== null && $freshIdentity->token !== '') {
                 return $freshIdentity;
             }
 
             $refresh = $identity->refresh_token;
-            if (! is_string($refresh) || $refresh === '') {
-                throw SSOException::userNotFound('missing-refresh-token');
-            }
 
             $tokens = $this->oauthService->refreshAccessToken($refresh);
             $user->updateMicrosoftTokens([
@@ -284,7 +287,7 @@ class MicrosoftGraphService
      *     department: ?string,
      *     officeLocation: ?string,
      *     mobilePhone: ?string,
-     *     businessPhones: array<int, mixed>,
+     *     businessPhones: list<string>,
      *     city: ?string,
      *     state: ?string,
      *     country: ?string,
@@ -300,10 +303,7 @@ class MicrosoftGraphService
             throw SSOException::invalidGraphResponse('profile');
         }
 
-        $phones = Arr::get($data, 'businessPhones', []);
-        if (! is_array($phones)) {
-            $phones = [];
-        }
+        $phones = Payload::strings(Arr::get($data, 'businessPhones', []));
 
         return [
             'id' => $id,
@@ -329,20 +329,6 @@ class MicrosoftGraphService
     private static function optionalString(mixed $value): ?string
     {
         return is_string($value) ? $value : null;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function jsonAsAssoc(mixed $data): array
-    {
-        if (! is_array($data)) {
-            return [];
-        }
-
-        return collect($data)
-            ->filter(fn ($v, $k) => is_string($k))
-            ->all();
     }
 
     private static function stringifyAuthId(SSOAuthenticatable $user): string

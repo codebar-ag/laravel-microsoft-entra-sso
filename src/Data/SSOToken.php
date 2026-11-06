@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodebarAg\MicrosoftEntraSSO\Data;
 
 use CodebarAg\MicrosoftEntraSSO\Exceptions\TokenExchangeException;
 use Illuminate\Support\Arr;
 
-class SSOToken
+final class SSOToken
 {
     /**
      * @param  array<int, string>  $approvedScopes

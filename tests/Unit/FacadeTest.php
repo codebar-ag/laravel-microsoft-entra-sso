@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use CodebarAg\MicrosoftEntraSSO\Contracts\Factory;
 use CodebarAg\MicrosoftEntraSSO\Facades\MicrosoftEntraSSO;
 use CodebarAg\MicrosoftEntraSSO\MicrosoftEntraSSOManager;
