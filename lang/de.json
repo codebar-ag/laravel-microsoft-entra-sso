@@ -29,5 +29,8 @@
     "microsoft-entra-sso.error.identity_tenant_mismatch": "Diese Microsoft-Identitaet ist bereits mit einer anderen Microsoft-Organisation verknuepft.",
     "microsoft-entra-sso.error.invalid_login_gate": "Das konfigurierte Login-Gate [:class] existiert nicht oder implementiert den LoginGate-Contract nicht.",
     "microsoft-entra-sso.error.invalid_email_linking": "Der konfigurierte E-Mail-Verknuepfungsmodus [:mode] ist ungueltig. Verwenden Sie always, same_tenant_only oder never.",
-    "microsoft-entra-sso.error.id_token_missing": "Die Token-Antwort enthielt kein ID-Token."
+    "microsoft-entra-sso.error.id_token_missing": "Die Token-Antwort enthielt kein ID-Token.",
+    "microsoft-entra-sso.error.token_failed": "Microsoft konnte die Anmeldung nicht abschliessen. Bitte versuchen Sie es erneut.",
+    "microsoft-entra-sso.error.invalid_id_token": "Die Microsoft-Anmeldung konnte nicht verifiziert werden. Bitte versuchen Sie es erneut.",
+    "microsoft-entra-sso.error.graph_failed": "Ihr Microsoft-Profil konnte nicht geladen werden. Bitte versuchen Sie es erneut."
 }

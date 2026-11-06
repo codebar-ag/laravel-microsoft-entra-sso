@@ -7,9 +7,11 @@ namespace CodebarAg\MicrosoftEntraSSO\Tests;
 use CodebarAg\MicrosoftEntraSSO\EntraSsoServiceProvider;
 use CodebarAg\MicrosoftEntraSSO\Models\MicrosoftSSOIdentity;
 use CodebarAg\MicrosoftEntraSSO\Tests\Support\EntraFake;
+use CodebarAg\MicrosoftEntraSSO\Tests\Support\FakeEntra;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Application;
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use LogicException;
@@ -28,6 +30,16 @@ abstract class TestCase extends BaseTestCase
     protected function container(): Application
     {
         return $this->app ?? throw new LogicException('The application is not booted.');
+    }
+
+    protected function entra(): FakeEntra
+    {
+        return new FakeEntra($this->container()->make(HttpFactory::class));
+    }
+
+    protected function http(): HttpFactory
+    {
+        return $this->container()->make(HttpFactory::class);
     }
 
     protected function settings(): Repository

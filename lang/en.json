@@ -29,5 +29,8 @@
     "microsoft-entra-sso.error.identity_tenant_mismatch": "This Microsoft identity is already linked to a different Microsoft organization.",
     "microsoft-entra-sso.error.invalid_login_gate": "The configured login gate [:class] does not exist or does not implement the LoginGate contract.",
     "microsoft-entra-sso.error.invalid_email_linking": "The configured email linking mode [:mode] is invalid. Use always, same_tenant_only or never.",
-    "microsoft-entra-sso.error.id_token_missing": "The token response did not contain an id token."
+    "microsoft-entra-sso.error.id_token_missing": "The token response did not contain an id token.",
+    "microsoft-entra-sso.error.token_failed": "Microsoft could not complete the sign-in. Please try again.",
+    "microsoft-entra-sso.error.invalid_id_token": "The Microsoft sign-in could not be verified. Please try again.",
+    "microsoft-entra-sso.error.graph_failed": "Your Microsoft profile could not be loaded. Please try again."
 }
