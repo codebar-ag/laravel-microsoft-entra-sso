@@ -11,7 +11,7 @@ Microsoft Entra ID (Azure AD) SSO authentication package for Laravel using OAuth
 
 ## Requirements
 
-- PHP 8.3, 8.4, or 8.5
+- PHP 8.5 or newer
 - Laravel 13
 - A Microsoft Entra app registration
 
