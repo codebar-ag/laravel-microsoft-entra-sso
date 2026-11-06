@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace CodebarAg\MicrosoftEntraSSO\Services;
 
 use CodebarAg\MicrosoftEntraSSO\Data\IdTokenClaims;
-use CodebarAg\MicrosoftEntraSSO\Support\Payload;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\TokenExchangeException;
+use CodebarAg\MicrosoftEntraSSO\Support\Payload;
 use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;

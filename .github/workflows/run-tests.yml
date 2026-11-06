@@ -2,9 +2,9 @@ name: run-tests
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, v14 ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, v14, 'v14-**' ]
 
 jobs:
   test:
@@ -29,7 +29,7 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, imagick, fileinfo
-          coverage: none
+          coverage: ${{ matrix.stability == 'prefer-stable' && 'xdebug' || 'none' }}
 
       - name: Setup problem matchers
         run: |
@@ -45,7 +45,12 @@ jobs:
         run: cp phpunit.xml.dist phpunit.xml
 
       - name: Run tests
+        if: matrix.stability == 'prefer-lowest'
         run: vendor/bin/pest --no-coverage
+
+      - name: Run tests with the coverage threshold
+        if: matrix.stability == 'prefer-stable'
+        run: vendor/bin/pest --coverage --min=90
 
       - name: Store log artifacts
         if: failure()

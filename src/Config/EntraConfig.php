@@ -13,7 +13,7 @@ use SensitiveParameter;
 
 /**
  * The validated package configuration. Built once from the config array; an invalid value
- * throws a ConfigurationException that names the key. Nothing else in the package reads config().
+ * throws a ConfigurationException that names the key. Nothing else in the package reads the config repository.
  */
 final readonly class EntraConfig
 {

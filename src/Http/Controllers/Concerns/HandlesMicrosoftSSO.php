@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CodebarAg\MicrosoftEntraSSO\Http\Controllers\Concerns;
 
+use CodebarAg\MicrosoftEntraSSO\Config\EntraConfig;
 use CodebarAg\MicrosoftEntraSSO\Contracts\LoginGate;
 use CodebarAg\MicrosoftEntraSSO\Contracts\SSOAuthenticatable;
 use CodebarAg\MicrosoftEntraSSO\Data\SSOUser;
@@ -14,8 +15,6 @@ use CodebarAg\MicrosoftEntraSSO\Exceptions\InvalidStateException;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\LoginDeniedException;
 use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
 use CodebarAg\MicrosoftEntraSSO\Services\EmailLinkingPolicy;
-use CodebarAg\MicrosoftEntraSSO\Config\EntraConfig;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;

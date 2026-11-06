@@ -2,9 +2,9 @@ name: linter
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, v14 ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, v14, 'v14-**' ]
 
 jobs:
   lint:

@@ -5,14 +5,13 @@ on:
     paths:
       - '**/*.php'
       - 'phpstan.neon.dist'
-      - 'phpstan-baseline.neon'
       - 'composer.json'
       - 'composer.lock'
   pull_request:
+    branches: [ main, v14, 'v14-**' ]
     paths:
       - '**/*.php'
       - 'phpstan.neon.dist'
-      - 'phpstan-baseline.neon'
       - 'composer.json'
       - 'composer.lock'
   workflow_dispatch:
@@ -39,4 +38,4 @@ jobs:
         uses: ramsey/composer-install@4.0.0
 
       - name: Run PHPStan
-        run: ./vendor/bin/phpstan --error-format=github
+        run: ./vendor/bin/phpstan analyse --memory-limit=1G --error-format=github
