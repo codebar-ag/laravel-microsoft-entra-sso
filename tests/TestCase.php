@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace CodebarAg\MicrosoftEntraSSO\Tests;
 
 use CodebarAg\MicrosoftEntraSSO\EntraSsoServiceProvider;
-use CodebarAg\MicrosoftEntraSSO\Tests\Support\EntraFake;
 use CodebarAg\MicrosoftEntraSSO\Models\MicrosoftSSOIdentity;
+use CodebarAg\MicrosoftEntraSSO\Tests\Support\EntraFake;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;

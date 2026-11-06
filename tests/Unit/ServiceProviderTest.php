@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use CodebarAg\MicrosoftEntraSSO\Contracts\Factory;
 use CodebarAg\MicrosoftEntraSSO\Contracts\Provider;
-use CodebarAg\MicrosoftEntraSSO\MicrosoftEntraSSOManager;
 use CodebarAg\MicrosoftEntraSSO\EntraSsoServiceProvider;
+use CodebarAg\MicrosoftEntraSSO\MicrosoftEntraSSOManager;
 use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftOAuthService;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;

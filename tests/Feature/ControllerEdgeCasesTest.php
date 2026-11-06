@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Http;
 
 it('prevents callback replay because state is pulled from session', function () {

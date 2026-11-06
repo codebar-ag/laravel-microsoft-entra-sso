@@ -78,7 +78,7 @@ final class MicrosoftOAuthService implements Provider
             'response_mode' => 'query',
             'scope' => implode(' ', $this->scopes),
             'state' => $state,
-            'code_challenge' => static::generateCodeChallenge($codeVerifier),
+            'code_challenge' => self::generateCodeChallenge($codeVerifier),
             'code_challenge_method' => 'S256',
             'prompt' => 'select_account',
         ];
@@ -320,5 +320,4 @@ final class MicrosoftOAuthService implements Provider
 
         return $default;
     }
-
 }

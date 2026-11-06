@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use CodebarAg\MicrosoftEntraSSO\Exceptions\SSOException;
-use CodebarAg\MicrosoftEntraSSO\Services\MicrosoftOAuthService;
 use CodebarAg\MicrosoftEntraSSO\Tests\TestUser;
 
 use function Pest\Laravel\get;
@@ -69,4 +67,3 @@ it('supports guard names with underscores', function () {
     $response->assertRedirect();
     $response->assertSessionHas('microsoft_entra_sso_guard', 'admin_api');
 });
-

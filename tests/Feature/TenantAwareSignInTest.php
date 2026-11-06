@@ -367,4 +367,3 @@ it('keeps an existing tenant when tokens are updated', function () {
 });
 
 // --- migration ------------------------------------------------------------
-
