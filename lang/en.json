@@ -1,9 +1,4 @@
 {
-    "microsoft-entra-sso.button.sign_in": "Sign in with Microsoft",
-    "microsoft-entra-sso.button.back_to_login": "Back to Login",
-    "microsoft-entra-sso.error.page_title": "SSO Authentication Error",
-    "microsoft-entra-sso.error.auth_failed": "Authentication Failed",
-    "microsoft-entra-sso.error.auth_failed_message": "We couldn't sign you in with your Microsoft account. This could be a temporary issue - please try again.",
     "microsoft-entra-sso.error.token_failed": "Microsoft could not complete the sign-in. Please try again.",
     "microsoft-entra-sso.error.invalid_id_token": "The Microsoft sign-in could not be verified. Please try again.",
     "microsoft-entra-sso.error.graph_failed": "Your Microsoft profile could not be loaded. Please try again.",

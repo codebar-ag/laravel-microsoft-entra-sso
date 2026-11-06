@@ -28,7 +28,6 @@ final class EntraSsoServiceProvider extends ServiceProvider
         $this->registerRoutes();
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadJsonTranslationsFrom(__DIR__.'/../lang');
-        $this->loadViewsFrom(__DIR__.'/../resources/views', 'microsoft-entra-sso');
         $this->registerPublishables();
     }
 
@@ -64,10 +63,6 @@ final class EntraSsoServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../config/microsoft-entra-sso.php' => config_path('microsoft-entra-sso.php'),
         ], 'microsoft-entra-sso-config');
-
-        $this->publishes([
-            __DIR__.'/../resources/views' => resource_path('views/vendor/microsoft-entra-sso'),
-        ], 'microsoft-entra-sso-views');
 
         $this->publishes([
             __DIR__.'/../lang/en.json' => lang_path('en.json'),
